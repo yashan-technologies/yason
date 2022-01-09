@@ -1,0 +1,16 @@
+[package]
+name = "yason"
+version = "0.0.0"
+authors = ["David Li <davidli2010@foxmail.com>"]
+edition = "2021"
+readme = "README.md"
+license = "Apache-2.0"
+description = "Encoding and decoding support for YASON in Rust"
+keywords = ["yashandb", "yason", "json", "binary"]
+repository = "https://github.com/cod-technologies/yason.git"
+homepage = "https://github.com/cod-technologies/yason"
+documentation = "https://docs.rs/yason/"
+
+[dependencies]
+decimal-rs = "0.1.30"
+sqldatetime = { version = "0.1.23", features = ["oracle"] }
