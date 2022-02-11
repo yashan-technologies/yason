@@ -3,6 +3,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+/// Possible yason types.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum DataType {
@@ -21,6 +22,21 @@ impl From<DataType> for u8 {
     }
 }
 
+impl Display for DataType {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            DataType::Object => write!(f, "Object"),
+            DataType::Array => write!(f, "Array"),
+            DataType::String => write!(f, "String"),
+            DataType::Number => write!(f, "Number"),
+            DataType::Bool => write!(f, "Bool"),
+            DataType::Null => write!(f, "Null"),
+        }
+    }
+}
+
+/// Invalid data type.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct InvalidDataType(u8);
@@ -45,7 +61,7 @@ impl TryFrom<u8> for DataType {
 impl Display for InvalidDataType {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "invalid data type value '{}'", self.0)
+        write!(f, "invalid data type yason '{}'", self.0)
     }
 }
 
