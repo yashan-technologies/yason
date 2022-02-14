@@ -184,5 +184,4 @@ pub use self::{
     data_type::{DataType, InvalidDataType},
     yason::{Array, ArrayIter, KeyIter, Object, ObjectIter, Value, ValueIter, Yason, YasonBuf, YasonError},
 };
-use crate::binary::MAX_DATA_LENGTH_SIZE;
 pub use decimal_rs::Decimal as Number;
