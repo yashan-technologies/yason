@@ -1,8 +1,9 @@
 //! Basic functions.
 
+use crate::binary::MAX_DATA_LENGTH_SIZE;
 use crate::vec::VecExt;
 use crate::yason::YasonResult;
-use crate::{YasonError, MAX_DATA_LENGTH_SIZE};
+use crate::YasonError;
 use std::cmp::Ordering;
 
 #[inline]

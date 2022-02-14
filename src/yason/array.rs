@@ -144,8 +144,7 @@ impl<'a> Array<'a> {
     #[inline]
     fn read_string(&self, value_entry_pos: usize) -> YasonResult<&str> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
-        let (string, _) = self.0.read_string(value_pos)?;
-        Ok(string)
+        self.0.read_string(value_pos)
     }
 
     #[inline]

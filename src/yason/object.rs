@@ -201,8 +201,7 @@ impl<'a> Object<'a> {
 
     #[inline]
     fn read_string(&self, value_pos: usize) -> YasonResult<&str> {
-        let (string, _) = self.0.read_string(value_pos + DATA_TYPE_SIZE)?;
-        Ok(string)
+        self.0.read_string(value_pos + DATA_TYPE_SIZE)
     }
 
     #[inline]

@@ -142,7 +142,7 @@ impl Yason {
     #[inline]
     pub fn string(&self) -> YasonResult<&str> {
         self.check_type(0, DataType::String)?;
-        Ok(self.read_string(DATA_TYPE_SIZE)?.0)
+        self.read_string(DATA_TYPE_SIZE)
     }
 
     /// If `Yason` is `Number`, return its value. Returns `YasonError` otherwise.
@@ -229,12 +229,12 @@ impl Yason {
     }
 
     #[inline]
-    fn read_string(&self, pos: usize) -> YasonResult<(&str, usize)> {
+    fn read_string(&self, pos: usize) -> YasonResult<&str> {
         let (data_length, data_length_len) = decode_varint(&self.bytes, pos)?;
         let end = pos + data_length_len + data_length as usize;
         let bytes = self.slice(pos + data_length_len, end)?;
         let string = unsafe { std::str::from_utf8_unchecked(bytes) };
-        Ok((string, end))
+        Ok(string)
     }
 
     #[inline]
