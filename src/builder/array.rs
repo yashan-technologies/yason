@@ -175,49 +175,6 @@ impl ArrayBuilder {
         self.0.finish()?;
         Ok(unsafe { YasonBuf::new_unchecked(self.0.bytes_wrapper.bytes) })
     }
-
-    /// Pushes an embedded object with specified element count and a flag which indicates whether the embedded object is sorted by key.
-    #[inline]
-    pub fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder> {
-        let obj_builder = self.0.push_object(element_count, key_sorted)?;
-        Ok(ObjectRefBuilder(obj_builder))
-    }
-
-    /// Pushes an embedded array with specified element count.
-    #[inline]
-    pub fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder> {
-        let array_builder = self.0.push_array(element_count)?;
-        Ok(ArrayRefBuilder(array_builder))
-    }
-
-    /// Pushes a string value.
-    #[inline]
-    pub fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self> {
-        let value = value.as_ref();
-        self.0.push_string(value)?;
-        Ok(self)
-    }
-
-    /// Pushes a number value.
-    #[inline]
-    pub fn push_number(&mut self, value: Number) -> BuildResult<&mut Self> {
-        self.0.push_number(value)?;
-        Ok(self)
-    }
-
-    /// Pushes a bool value.
-    #[inline]
-    pub fn push_bool(&mut self, value: bool) -> BuildResult<&mut Self> {
-        self.0.push_bool(value)?;
-        Ok(self)
-    }
-
-    /// Pushes a null value.
-    #[inline]
-    pub fn push_null(&mut self) -> BuildResult<&mut Self> {
-        self.0.push_null()?;
-        Ok(self)
-    }
 }
 
 /// Builder for encoding an array.
@@ -239,47 +196,86 @@ impl<'a> ArrayRefBuilder<'a> {
         let bytes = self.0.bytes_wrapper.bytes;
         Ok(unsafe { Yason::new_unchecked(&bytes[bytes_init_len..]) })
     }
+}
 
-    /// Creates an `ObjectRefBuilder` for the embedded object with specified element count.
-    #[inline]
-    pub fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder> {
-        let obj_builder = self.0.push_object(element_count, key_sorted)?;
-        Ok(ObjectRefBuilder(obj_builder))
-    }
+pub trait ArrBuilder {
+    /// Pushes an embedded object with specified element count and a flag which indicates whether the embedded object is sorted by key.
+    fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder>;
 
-    /// Creates an embedded array with specified element count.
-    #[inline]
-    pub fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder> {
-        let array_builder = self.0.push_array(element_count)?;
-        Ok(ArrayRefBuilder(array_builder))
-    }
+    /// Pushes an embedded array with specified element count.
+    fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder>;
 
     /// Pushes a string value.
-    #[inline]
-    pub fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self> {
-        let value = value.as_ref();
-        self.0.push_string(value)?;
-        Ok(self)
-    }
+    fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self>;
 
     /// Pushes a number value.
-    #[inline]
-    pub fn push_number(&mut self, value: Number) -> BuildResult<&mut Self> {
-        self.0.push_number(value)?;
-        Ok(self)
-    }
+    fn push_number(&mut self, value: Number) -> BuildResult<&mut Self>;
 
     /// Pushes a bool value.
-    #[inline]
-    pub fn push_bool(&mut self, value: bool) -> BuildResult<&mut Self> {
-        self.0.push_bool(value)?;
-        Ok(self)
-    }
+    fn push_bool(&mut self, value: bool) -> BuildResult<&mut Self>;
 
     /// Pushes a null value.
-    #[inline]
-    pub fn push_null(&mut self) -> BuildResult<&mut Self> {
-        self.0.push_null()?;
-        Ok(self)
-    }
+    fn push_null(&mut self) -> BuildResult<&mut Self>;
 }
+
+macro_rules! impl_push_methods {
+    ($v: vis,) => {
+        /// Pushes an embedded object with specified element count and a flag which indicates whether the embedded object is sorted by key.
+        #[inline]
+        $v fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder> {
+            let obj_builder = self.0.push_object(element_count, key_sorted)?;
+            Ok(ObjectRefBuilder(obj_builder))
+        }
+
+        /// Pushes an embedded array with specified element count.
+        #[inline]
+        $v fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder> {
+            let array_builder = self.0.push_array(element_count)?;
+            Ok(ArrayRefBuilder(array_builder))
+        }
+
+        /// Pushes a string value.
+        #[inline]
+        $v fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self> {
+            let value = value.as_ref();
+            self.0.push_string(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a number value.
+        #[inline]
+        $v fn push_number(&mut self, value: Number) -> BuildResult<&mut Self> {
+            self.0.push_number(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a bool value.
+        #[inline]
+        $v fn push_bool(&mut self, value: bool) -> BuildResult<&mut Self> {
+            self.0.push_bool(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a null value.
+        #[inline]
+        $v fn push_null(&mut self) -> BuildResult<&mut Self> {
+            self.0.push_null()?;
+            Ok(self)
+        }
+    };
+}
+
+macro_rules! impl_builder {
+    ($builder: ty) => {
+        impl $builder {
+            impl_push_methods!(pub,);
+        }
+
+        impl ArrBuilder for $builder {
+            impl_push_methods!(,);
+        }
+    };
+}
+
+impl_builder!(ArrayBuilder);
+impl_builder!(ArrayRefBuilder<'_>);

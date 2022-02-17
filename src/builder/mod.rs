@@ -4,8 +4,8 @@ mod array;
 mod object;
 mod scalar;
 
-pub use array::{ArrayBuilder, ArrayRefBuilder};
-pub use object::{ObjectBuilder, ObjectRefBuilder};
+pub use array::{ArrBuilder, ArrayBuilder, ArrayRefBuilder};
+pub use object::{ObjBuilder, ObjectBuilder, ObjectRefBuilder};
 pub use scalar::Scalar;
 
 use std::collections::TryReserveError;

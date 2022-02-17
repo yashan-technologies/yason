@@ -3,10 +3,11 @@
 mod array;
 mod object;
 
-use crate::binary::{DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE};
-use crate::util::decode_varint;
 pub use crate::yason::array::{Array, ArrayIter};
 pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
+
+use crate::binary::{DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE};
+use crate::util::decode_varint;
 use crate::{DataType, Number};
 use std::borrow::Borrow;
 use std::error::Error;
