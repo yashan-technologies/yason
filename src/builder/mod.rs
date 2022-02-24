@@ -14,6 +14,25 @@ use std::fmt::{Display, Formatter};
 
 const DEFAULT_SIZE: usize = 128;
 
+/// Possible errors that can arise during dealing with number.
+#[derive(Debug)]
+pub enum NumberError {
+    Overflow,
+    FormatError,
+}
+
+impl Display for NumberError {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NumberError::Overflow => write!(f, "numeric overflow"),
+            NumberError::FormatError => write!(f, "an error occurred when formatting a number"),
+        }
+    }
+}
+
+impl Error for NumberError {}
+
 /// Possible errors that can arise during building.
 #[derive(Debug)]
 pub enum BuildError {
@@ -21,6 +40,8 @@ pub enum BuildError {
     InnerUncompletedError,
     InconsistentElementCount { expected: u16, actual: u16 },
     StringTooLong(usize),
+    JsonError(serde_json::Error),
+    NumberError(NumberError),
 }
 
 impl Display for BuildError {
@@ -35,6 +56,8 @@ impl Display for BuildError {
                 expected, actual
             ),
             BuildError::StringTooLong(e) => write!(f, "string too long, length is {}", e),
+            BuildError::JsonError(e) => write!(f, "{}", e),
+            BuildError::NumberError(e) => write!(f, "{}", e),
         }
     }
 }

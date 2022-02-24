@@ -175,12 +175,13 @@
 mod binary;
 mod builder;
 mod data_type;
+mod json;
 mod util;
 mod vec;
 mod yason;
 
 pub use self::{
-    builder::{ArrayBuilder, ArrayRefBuilder, BuildError, ObjectBuilder, ObjectRefBuilder, Scalar},
+    builder::{ArrayBuilder, ArrayRefBuilder, BuildError, NumberError, ObjectBuilder, ObjectRefBuilder, Scalar},
     data_type::{DataType, InvalidDataType},
     yason::{Array, ArrayIter, KeyIter, Object, ObjectIter, Value, ValueIter, Yason, YasonBuf, YasonError},
 };

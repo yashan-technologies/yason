@@ -12,8 +12,9 @@ homepage = "https://github.com/cod-technologies/yason"
 documentation = "https://docs.rs/yason/"
 
 [dependencies]
-decimal-rs = "0.1.30"
+decimal-rs = "0.1.31"
 sqldatetime = { version = "0.1.23", features = ["oracle"] }
+serde_json = {version = "1.0.79", features = ["arbitrary_precision"]}
 
 [dev-dependencies]
 bencher = "0.1.5"
