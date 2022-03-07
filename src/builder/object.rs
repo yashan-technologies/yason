@@ -5,7 +5,7 @@ use crate::binary::{
     NUMBER_LENGTH_SIZE, OBJECT_SIZE,
 };
 use crate::builder::array::{ArrayRefBuilder, InnerArrayBuilder};
-use crate::builder::{BuildResult, BytesWrapper, DEFAULT_SIZE};
+use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
 use crate::util::cmp_key;
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
@@ -13,54 +13,64 @@ use crate::{BuildError, DataType, Number};
 use decimal_rs::MAX_BINARY_SIZE;
 use std::ptr;
 
-pub(crate) struct InnerObjectBuilder<B: AsMut<Vec<u8>>> {
-    bytes_wrapper: BytesWrapper<B>,
+pub(crate) struct InnerObjectBuilder<'a, B: AsMut<Vec<u8>>> {
+    bytes: B,
     element_count: u16,
     start_pos: usize,
     key_offset_pos: usize,
     value_count: u16,
-    depth: usize,
     bytes_init_len: usize,
     key_sorted: bool,
+    current_depth: usize,
+    total_nested_depth: Depth<'a>,
 }
 
-impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
+impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
     #[inline]
-    pub(crate) fn try_new(bytes: B, element_count: u16, key_sorted: bool) -> BuildResult<Self> {
-        let mut bytes_wrapper = BytesWrapper::new(bytes);
-        let bytes = bytes_wrapper.bytes.as_mut();
-        let bytes_init_len = bytes.len();
+    pub(crate) fn try_new(
+        mut bytes: B,
+        element_count: u16,
+        key_sorted: bool,
+        mut total_depth: Depth<'a>,
+    ) -> BuildResult<Self> {
+        if total_depth.depth() >= MAX_NESTED_DEPTH {
+            return Err(BuildError::NestedTooDeeply);
+        }
+
+        let bs = bytes.as_mut();
+        let bytes_init_len = bs.len();
 
         let size = DATA_TYPE_SIZE + OBJECT_SIZE + ELEMENT_COUNT_SIZE + KEY_OFFSET_SIZE * (element_count as usize);
-        bytes.try_reserve(size)?;
+        bs.try_reserve(size)?;
 
-        bytes.push_data_type(DataType::Object); // type
-        bytes.skip_size(); // size
-        let start_pos = bytes.len();
-        bytes.push_u16(element_count); // element-count
-        let key_offset_pos = bytes.len();
-        bytes.skip_key_offset(element_count as usize); // key-offset
-        bytes_wrapper.depth += 1;
+        bs.push_data_type(DataType::Object); // type
+        bs.skip_size(); // size
+        let start_pos = bs.len();
+        bs.push_u16(element_count); // element-count
+        let key_offset_pos = bs.len();
+        bs.skip_key_offset(element_count as usize); // key-offset
+
+        total_depth.increase();
 
         Ok(Self {
-            depth: bytes_wrapper.depth,
-            bytes_wrapper,
+            bytes,
             element_count,
             start_pos,
             key_offset_pos,
             value_count: 0,
             bytes_init_len,
             key_sorted,
+            current_depth: total_depth.depth(),
+            total_nested_depth: total_depth,
         })
     }
 
     #[inline]
     fn key_sorted(&mut self) -> bool {
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-
         let left = self.start_pos + ELEMENT_COUNT_SIZE;
         let right = left + self.element_count as usize * KEY_OFFSET_SIZE;
 
+        let bytes = self.bytes.as_mut();
         let key_offsets_bytes = bytes[left..right].as_mut_ptr() as *mut u32;
         let key_offsets = unsafe { std::slice::from_raw_parts(key_offsets_bytes, (right - left) / 4) };
 
@@ -82,12 +92,9 @@ impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
 
     #[inline]
     fn finish(&mut self) -> BuildResult<usize> {
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-
-        if self.depth != self.bytes_wrapper.depth {
+        if self.current_depth != self.total_nested_depth.depth() {
             return Err(BuildError::InnerUncompletedError);
         }
-
         if self.value_count != self.element_count {
             return Err(BuildError::InconsistentElementCount {
                 expected: self.element_count,
@@ -95,13 +102,13 @@ impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
             });
         }
 
+        let bytes = self.bytes.as_mut();
         let total_size = bytes.len() - self.start_pos;
         bytes.write_total_size(total_size as i32, self.start_pos - OBJECT_SIZE);
 
-        self.bytes_wrapper.depth -= 1;
+        self.total_nested_depth.decrease();
 
         debug_assert!(self.key_sorted());
-
         Ok(self.bytes_init_len)
     }
 
@@ -110,11 +117,11 @@ impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
     where
         F: FnOnce(&mut Vec<u8>) -> BuildResult<()>,
     {
-        if self.depth != self.bytes_wrapper.depth {
+        if self.current_depth != self.total_nested_depth.depth() {
             return Err(BuildError::InnerUncompletedError);
         }
 
-        let bytes = self.bytes_wrapper.bytes.as_mut();
+        let bytes = self.bytes.as_mut();
         bytes.try_reserve(reserved_size)?;
 
         if !self.key_sorted {
@@ -143,7 +150,6 @@ impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
         f(bytes)?;
 
         self.value_count += 1;
-
         Ok(())
     }
 
@@ -186,16 +192,16 @@ impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
     ) -> BuildResult<InnerObjectBuilder<&mut Vec<u8>>> {
         let size = key.len() + KEY_LENGTH_SIZE;
         self.push_key_value_by(key, size, |_| Ok(()))?;
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-        InnerObjectBuilder::try_new(bytes, element_count, key_sorted)
+        let bytes = self.bytes.as_mut();
+        InnerObjectBuilder::try_new(bytes, element_count, key_sorted, self.total_nested_depth.borrow_mut())
     }
 
     #[inline]
     fn push_array(&mut self, key: &str, element_count: u16) -> BuildResult<InnerArrayBuilder<&mut Vec<u8>>> {
         let size = key.len() + KEY_LENGTH_SIZE;
         self.push_key_value_by(key, size, |_| Ok(()))?;
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-        InnerArrayBuilder::try_new(bytes, element_count)
+        let bytes = self.bytes.as_mut();
+        InnerArrayBuilder::try_new(bytes, element_count, self.total_nested_depth.borrow_mut())
     }
 
     #[inline]
@@ -244,15 +250,15 @@ impl<B: AsMut<Vec<u8>>> InnerObjectBuilder<B> {
 
 /// Builder for encoding an object.
 #[repr(transparent)]
-pub struct ObjectBuilder(InnerObjectBuilder<Vec<u8>>);
+pub struct ObjectBuilder<'a>(InnerObjectBuilder<'a, Vec<u8>>);
 
-impl ObjectBuilder {
+impl ObjectBuilder<'_> {
     /// Creates `ObjectBuilder` with specified element count.
     /// `key_sorted` indicates whether the object is sorted by key.
     #[inline]
     pub fn try_new(element_count: u16, key_sorted: bool) -> BuildResult<Self> {
         let bytes = Vec::try_with_capacity(DEFAULT_SIZE)?;
-        let builder = InnerObjectBuilder::try_new(bytes, element_count, key_sorted)?;
+        let builder = InnerObjectBuilder::try_new(bytes, element_count, key_sorted, Depth::new())?;
         Ok(Self(builder))
     }
 
@@ -260,20 +266,20 @@ impl ObjectBuilder {
     #[inline]
     pub fn finish(mut self) -> BuildResult<YasonBuf> {
         self.0.finish()?;
-        Ok(unsafe { YasonBuf::new_unchecked(self.0.bytes_wrapper.bytes) })
+        Ok(unsafe { YasonBuf::new_unchecked(self.0.bytes) })
     }
 }
 
 /// Builder for encoding an object.
 #[repr(transparent)]
-pub struct ObjectRefBuilder<'a>(pub(crate) InnerObjectBuilder<&'a mut Vec<u8>>);
+pub struct ObjectRefBuilder<'a>(pub(crate) InnerObjectBuilder<'a, &'a mut Vec<u8>>);
 
 impl<'a> ObjectRefBuilder<'a> {
     /// Creates `ObjectRefBuilder` with specified element count.
     /// `key_sorted` indicates whether the object is sorted by key.
     #[inline]
     pub fn try_new(bytes: &'a mut Vec<u8>, element_count: u16, key_sorted: bool) -> BuildResult<Self> {
-        let obj_builder = InnerObjectBuilder::try_new(bytes, element_count, key_sorted)?;
+        let obj_builder = InnerObjectBuilder::try_new(bytes, element_count, key_sorted, Depth::new())?;
         Ok(Self(obj_builder))
     }
 
@@ -281,7 +287,7 @@ impl<'a> ObjectRefBuilder<'a> {
     #[inline]
     pub fn finish(mut self) -> BuildResult<&'a Yason> {
         let bytes_init_len = self.0.finish()?;
-        let bytes = self.0.bytes_wrapper.bytes;
+        let bytes = self.0.bytes;
         Ok(unsafe { Yason::new_unchecked(&bytes[bytes_init_len..]) })
     }
 }
@@ -385,5 +391,5 @@ macro_rules! impl_builder {
     };
 }
 
-impl_builder!(ObjectBuilder);
+impl_builder!(ObjectBuilder<'_>);
 impl_builder!(ObjectRefBuilder<'_>);

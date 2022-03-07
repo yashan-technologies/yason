@@ -1,6 +1,6 @@
 //! Object builder tests.
 
-use yason::{DataType, Number, ObjectBuilder, ObjectRefBuilder, Value, Yason, YasonBuf};
+use yason::{BuildError, DataType, Number, ObjectBuilder, ObjectRefBuilder, Value, Yason, YasonBuf};
 
 fn assert_string<T: AsRef<str>>(input: Value, expected: T) {
     if let Value::String(value) = input {
@@ -195,4 +195,54 @@ fn test_create_object_error() {
     let _ = builder.push_object("key", 3, true).unwrap();
     let res = builder.finish();
     assert!(res.is_err());
+}
+
+#[test]
+fn test_object_finish_error() {
+    let mut builder_level0 = ObjectBuilder::try_new(1, true).unwrap();
+    let _ = builder_level0.push_object("key", 1, true).unwrap();
+    let res = builder_level0.finish();
+    assert!(matches!(res.err(), Some(BuildError::InnerUncompletedError)));
+
+    let mut builder_level0 = ObjectBuilder::try_new(1, true).unwrap();
+    let _ = builder_level0.push_object("key", 1, true).unwrap();
+    let res = builder_level0.push_null("key");
+    assert!(matches!(res.err(), Some(BuildError::InnerUncompletedError)));
+}
+
+#[test]
+fn test_object_nested_depth() {
+    fn assert_nested_depth(total_depth: usize, err: Option<BuildError>) {
+        fn inner(
+            builder: Result<&mut ObjectRefBuilder, BuildError>,
+            cur_depth: usize,
+            total_depth: usize,
+        ) -> Option<BuildError> {
+            if cur_depth < total_depth {
+                let nested_builder = builder.unwrap().push_object("key", 1, true);
+                return if cur_depth < 100 {
+                    inner(Ok(&mut nested_builder.unwrap()), cur_depth + 1, total_depth)
+                } else {
+                    nested_builder.err()
+                };
+            }
+            None
+        }
+
+        let mut bytes = vec![];
+        let mut builder = ObjectRefBuilder::try_new(&mut bytes, 1, true).unwrap();
+        let res = inner(Ok(&mut builder), 1, total_depth);
+
+        if let Some(e) = err {
+            assert!(matches!(e, BuildError::NestedTooDeeply));
+        } else {
+            assert!(res.is_none());
+        }
+    }
+
+    assert_nested_depth(98, None);
+    assert_nested_depth(99, None);
+    assert_nested_depth(100, None);
+    assert_nested_depth(101, Some(BuildError::NestedTooDeeply));
+    assert_nested_depth(102, Some(BuildError::NestedTooDeeply));
 }

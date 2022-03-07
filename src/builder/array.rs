@@ -4,59 +4,62 @@ use crate::binary::{
     ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, MAX_DATA_LENGTH_SIZE, NUMBER_LENGTH_SIZE, VALUE_ENTRY_SIZE,
 };
 use crate::builder::object::InnerObjectBuilder;
-use crate::builder::{BuildResult, BytesWrapper, DEFAULT_SIZE};
+use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
 use crate::{BuildError, DataType, Number, ObjectRefBuilder};
 use decimal_rs::MAX_BINARY_SIZE;
 
-pub(crate) struct InnerArrayBuilder<B: AsMut<Vec<u8>>> {
-    bytes_wrapper: BytesWrapper<B>,
+pub(crate) struct InnerArrayBuilder<'a, B: AsMut<Vec<u8>>> {
+    bytes: B,
     element_count: u16,
     start_pos: usize,
     value_entry_pos: usize,
     value_count: u16,
-    depth: usize,
     bytes_init_len: usize,
+    current_depth: usize,
+    total_nested_depth: Depth<'a>,
 }
 
-impl<B: AsMut<Vec<u8>>> InnerArrayBuilder<B> {
+impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     #[inline]
-    pub(crate) fn try_new(bytes: B, element_count: u16) -> BuildResult<Self> {
-        let mut bytes_wrapper = BytesWrapper::new(bytes);
-        let bytes = bytes_wrapper.bytes.as_mut();
-        let bytes_init_len = bytes.len();
+    pub(crate) fn try_new(mut bytes: B, element_count: u16, mut total_depth: Depth<'a>) -> BuildResult<Self> {
+        if total_depth.depth() >= MAX_NESTED_DEPTH {
+            return Err(BuildError::NestedTooDeeply);
+        }
+
+        let bs = bytes.as_mut();
+        let bytes_init_len = bs.len();
 
         let size = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + VALUE_ENTRY_SIZE * element_count as usize;
-        bytes.try_reserve(size)?;
+        bs.try_reserve(size)?;
 
-        bytes.push_data_type(DataType::Array); // type
-        bytes.skip_size(); // size
-        let start_pos = bytes.len();
-        bytes.push_u16(element_count); // element-count
-        let value_entry_pos = bytes.len();
-        bytes.skip_value_entry(element_count as usize); // value-entry
-        bytes_wrapper.depth += 1;
+        bs.push_data_type(DataType::Array); // type
+        bs.skip_size(); // size
+        let start_pos = bs.len();
+        bs.push_u16(element_count); // element-count
+        let value_entry_pos = bs.len();
+        bs.skip_value_entry(element_count as usize); // value-entry
+
+        total_depth.increase();
 
         Ok(Self {
-            depth: bytes_wrapper.depth,
-            bytes_wrapper,
+            bytes,
             element_count,
             start_pos,
             value_entry_pos,
             value_count: 0,
             bytes_init_len,
+            current_depth: total_depth.depth(),
+            total_nested_depth: total_depth,
         })
     }
 
     #[inline]
     fn finish(&mut self) -> BuildResult<usize> {
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-
-        if self.depth != self.bytes_wrapper.depth {
+        if self.current_depth != self.total_nested_depth.depth() {
             return Err(BuildError::InnerUncompletedError);
         }
-
         if self.value_count != self.element_count {
             return Err(BuildError::InconsistentElementCount {
                 expected: self.element_count,
@@ -64,9 +67,11 @@ impl<B: AsMut<Vec<u8>>> InnerArrayBuilder<B> {
             });
         }
 
+        let bytes = self.bytes.as_mut();
         let total_size = bytes.len() - self.start_pos;
         bytes.write_total_size(total_size as i32, self.start_pos - ARRAY_SIZE);
-        self.bytes_wrapper.depth -= 1;
+
+        self.total_nested_depth.decrease();
 
         Ok(self.bytes_init_len)
     }
@@ -76,11 +81,11 @@ impl<B: AsMut<Vec<u8>>> InnerArrayBuilder<B> {
     where
         F: FnOnce(&mut Vec<u8>, u32, usize) -> BuildResult<()>,
     {
-        if self.depth != self.bytes_wrapper.depth {
+        if self.current_depth != self.total_nested_depth.depth() {
             return Err(BuildError::InnerUncompletedError);
         }
 
-        let bytes = self.bytes_wrapper.bytes.as_mut();
+        let bytes = self.bytes.as_mut();
         bytes.write_data_type_by_pos(data_type, self.value_entry_pos);
         let offset = bytes.len() - self.start_pos;
 
@@ -99,8 +104,8 @@ impl<B: AsMut<Vec<u8>>> InnerArrayBuilder<B> {
         };
         self.push_value(DataType::Object, f)?;
 
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-        InnerObjectBuilder::try_new(bytes, element_count, key_sorted)
+        let bytes = self.bytes.as_mut();
+        InnerObjectBuilder::try_new(bytes, element_count, key_sorted, self.total_nested_depth.borrow_mut())
     }
 
     #[inline]
@@ -111,8 +116,8 @@ impl<B: AsMut<Vec<u8>>> InnerArrayBuilder<B> {
         };
         self.push_value(DataType::Array, f)?;
 
-        let bytes = self.bytes_wrapper.bytes.as_mut();
-        InnerArrayBuilder::try_new(bytes, element_count)
+        let bytes = self.bytes.as_mut();
+        InnerArrayBuilder::try_new(bytes, element_count, self.total_nested_depth.borrow_mut())
     }
 
     #[inline]
@@ -158,14 +163,14 @@ impl<B: AsMut<Vec<u8>>> InnerArrayBuilder<B> {
 
 /// Builder for encoding an array.
 #[repr(transparent)]
-pub struct ArrayBuilder(InnerArrayBuilder<Vec<u8>>);
+pub struct ArrayBuilder<'a>(InnerArrayBuilder<'a, Vec<u8>>);
 
-impl ArrayBuilder {
+impl ArrayBuilder<'_> {
     /// Creates `ArrayBuilder` with specified element count.
     #[inline]
     pub fn try_new(element_count: u16) -> BuildResult<Self> {
         let bytes = Vec::try_with_capacity(DEFAULT_SIZE)?;
-        let builder = InnerArrayBuilder::try_new(bytes, element_count)?;
+        let builder = InnerArrayBuilder::try_new(bytes, element_count, Depth::new())?;
         Ok(Self(builder))
     }
 
@@ -173,19 +178,19 @@ impl ArrayBuilder {
     #[inline]
     pub fn finish(mut self) -> BuildResult<YasonBuf> {
         self.0.finish()?;
-        Ok(unsafe { YasonBuf::new_unchecked(self.0.bytes_wrapper.bytes) })
+        Ok(unsafe { YasonBuf::new_unchecked(self.0.bytes) })
     }
 }
 
 /// Builder for encoding an array.
 #[repr(transparent)]
-pub struct ArrayRefBuilder<'a>(pub(crate) InnerArrayBuilder<&'a mut Vec<u8>>);
+pub struct ArrayRefBuilder<'a>(pub(crate) InnerArrayBuilder<'a, &'a mut Vec<u8>>);
 
 impl<'a> ArrayRefBuilder<'a> {
     /// Creates `ArrayRefBuilder` with specified element count.
     #[inline]
     pub fn try_new(bytes: &'a mut Vec<u8>, element_count: u16) -> BuildResult<Self> {
-        let array_builder = InnerArrayBuilder::try_new(bytes, element_count)?;
+        let array_builder = InnerArrayBuilder::try_new(bytes, element_count, Depth::new())?;
         Ok(Self(array_builder))
     }
 
@@ -193,7 +198,7 @@ impl<'a> ArrayRefBuilder<'a> {
     #[inline]
     pub fn finish(mut self) -> BuildResult<&'a Yason> {
         let bytes_init_len = self.0.finish()?;
-        let bytes = self.0.bytes_wrapper.bytes;
+        let bytes = self.0.bytes;
         Ok(unsafe { Yason::new_unchecked(&bytes[bytes_init_len..]) })
     }
 }
@@ -277,5 +282,5 @@ macro_rules! impl_builder {
     };
 }
 
-impl_builder!(ArrayBuilder);
+impl_builder!(ArrayBuilder<'_>);
 impl_builder!(ArrayRefBuilder<'_>);

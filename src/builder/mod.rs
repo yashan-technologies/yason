@@ -13,6 +13,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 const DEFAULT_SIZE: usize = 128;
+const MAX_NESTED_DEPTH: usize = 100;
 
 /// Possible errors that can arise during dealing with number.
 #[derive(Debug)]
@@ -42,6 +43,7 @@ pub enum BuildError {
     StringTooLong(usize),
     JsonError(serde_json::Error),
     NumberError(NumberError),
+    NestedTooDeeply,
 }
 
 impl Display for BuildError {
@@ -58,6 +60,7 @@ impl Display for BuildError {
             BuildError::StringTooLong(e) => write!(f, "string too long, length is {}", e),
             BuildError::JsonError(e) => write!(f, "{}", e),
             BuildError::NumberError(e) => write!(f, "{}", e),
+            BuildError::NestedTooDeeply => write!(f, "nested too many depth"),
         }
     }
 }
@@ -73,14 +76,46 @@ impl From<TryReserveError> for BuildError {
 
 pub type BuildResult<T> = std::result::Result<T, BuildError>;
 
-struct BytesWrapper<B: AsMut<Vec<u8>>> {
-    bytes: B,
-    depth: usize,
+pub(crate) enum Depth<'a> {
+    Owned(usize),
+    Borrowed(&'a mut usize),
 }
 
-impl<B: AsMut<Vec<u8>>> BytesWrapper<B> {
+impl<'a> Depth<'a> {
     #[inline]
-    fn new(bytes: B) -> Self {
-        BytesWrapper { bytes, depth: 0 }
+    const fn new() -> Self {
+        Depth::Owned(0)
+    }
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Depth<'_> {
+        match self {
+            Depth::Owned(d) => Depth::Borrowed(d),
+            Depth::Borrowed(d) => Depth::Borrowed(*d),
+        }
+    }
+
+    #[inline]
+    fn depth(&self) -> usize {
+        match self {
+            Depth::Owned(d) => *d,
+            Depth::Borrowed(d) => **d,
+        }
+    }
+
+    #[inline]
+    fn increase(&mut self) {
+        match self {
+            Depth::Borrowed(d) => **d += 1,
+            Depth::Owned(d) => *d += 1,
+        }
+    }
+
+    #[inline]
+    fn decrease(&mut self) {
+        match self {
+            Depth::Borrowed(d) => **d -= 1,
+            Depth::Owned(d) => *d -= 1,
+        }
     }
 }
