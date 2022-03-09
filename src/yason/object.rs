@@ -11,20 +11,20 @@ pub struct Object<'a>(&'a Yason);
 impl<'a> Object<'a> {
     /// Gets an iterator over the entries of the object.
     #[inline]
-    pub fn iter(&self) -> YasonResult<ObjectIter> {
-        ObjectIter::try_new(self)
+    pub fn iter(&self) -> YasonResult<ObjectIter<'a>> {
+        ObjectIter::try_new(self.0)
     }
 
     /// Gets an iterator over the keys of the object.
     #[inline]
-    pub fn key_iter(&self) -> YasonResult<KeyIter> {
-        KeyIter::try_new(self)
+    pub fn key_iter(&self) -> YasonResult<KeyIter<'a>> {
+        KeyIter::try_new(self.0)
     }
 
     /// Gets an iterator over the keys of the object.
     #[inline]
-    pub fn value_iter(&self) -> YasonResult<ValueIter> {
-        ValueIter::try_new(self)
+    pub fn value_iter(&self) -> YasonResult<ValueIter<'a>> {
+        ValueIter::try_new(self.0)
     }
 
     /// Creates an `Object`.
@@ -165,7 +165,7 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    fn read_key(&self, key_offset: usize) -> YasonResult<(&str, usize)> {
+    fn read_key(&self, key_offset: usize) -> YasonResult<(&'a str, usize)> {
         let len_pos = key_offset + DATA_TYPE_SIZE + OBJECT_SIZE;
         let len = self.0.read_u16(len_pos)? as usize;
         let key_pos = len_pos + KEY_LENGTH_SIZE;
@@ -186,21 +186,21 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    fn read_object(&self, value_pos: usize) -> YasonResult<Object> {
+    fn read_object(&self, value_pos: usize) -> YasonResult<Object<'a>> {
         let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
         Ok(unsafe { Object::new_unchecked(yason) })
     }
 
     #[inline]
-    fn read_array(&self, value_pos: usize) -> YasonResult<Array> {
+    fn read_array(&self, value_pos: usize) -> YasonResult<Array<'a>> {
         let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
         Ok(unsafe { Array::new_unchecked(yason) })
     }
 
     #[inline]
-    fn read_string(&self, value_pos: usize) -> YasonResult<&str> {
+    fn read_string(&self, value_pos: usize) -> YasonResult<&'a str> {
         self.0.read_string(value_pos + DATA_TYPE_SIZE)
     }
 
@@ -215,7 +215,7 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    fn read_value(&self, value_pos: usize) -> YasonResult<Value> {
+    fn read_value(&self, value_pos: usize) -> YasonResult<Value<'a>> {
         let data_type = self.0.read_type(value_pos)?;
         let value = match data_type {
             DataType::Object => Value::Object(self.read_object(value_pos)?),
@@ -266,17 +266,18 @@ impl<'a> Object<'a> {
 
 /// An iterator over the object's entries.
 pub struct ObjectIter<'a> {
-    object: &'a Object<'a>,
+    object: Object<'a>,
     len: usize,
     index: usize,
 }
 
 impl<'a> ObjectIter<'a> {
     #[inline]
-    fn try_new(object: &'a Object) -> YasonResult<Self> {
+    fn try_new(yason: &'a Yason) -> YasonResult<Self> {
+        let object = Object(yason);
         Ok(Self {
-            object,
             len: object.len()?,
+            object,
             index: 0,
         })
     }
@@ -329,9 +330,9 @@ pub struct KeyIter<'a> {
 
 impl<'a> KeyIter<'a> {
     #[inline]
-    fn try_new(object: &'a Object) -> YasonResult<Self> {
+    fn try_new(yason: &'a Yason) -> YasonResult<Self> {
         Ok(Self {
-            inner: ObjectIter::try_new(object)?,
+            inner: ObjectIter::try_new(yason)?,
         })
     }
 }
@@ -357,9 +358,9 @@ pub struct ValueIter<'a> {
 
 impl<'a> ValueIter<'a> {
     #[inline]
-    fn try_new(object: &'a Object) -> YasonResult<Self> {
+    fn try_new(yason: &'a Yason) -> YasonResult<Self> {
         Ok(Self {
-            inner: ObjectIter::try_new(object)?,
+            inner: ObjectIter::try_new(yason)?,
         })
     }
 }

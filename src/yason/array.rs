@@ -11,8 +11,8 @@ pub struct Array<'a>(&'a Yason);
 impl<'a> Array<'a> {
     /// Gets an iterator over the values of the array.
     #[inline]
-    pub fn iter(&self) -> YasonResult<ArrayIter> {
-        ArrayIter::try_new(self)
+    pub fn iter(&self) -> YasonResult<ArrayIter<'a>> {
+        ArrayIter::try_new(self.0)
     }
 
     /// Creates an `Array`.
@@ -126,7 +126,7 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
-    fn read_object(&self, value_entry_pos: usize) -> YasonResult<Object> {
+    fn read_object(&self, value_entry_pos: usize) -> YasonResult<Object<'a>> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
         let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
@@ -134,7 +134,7 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
-    fn read_array(&self, value_entry_pos: usize) -> YasonResult<Array> {
+    fn read_array(&self, value_entry_pos: usize) -> YasonResult<Array<'a>> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
         let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
@@ -142,7 +142,7 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
-    fn read_string(&self, value_entry_pos: usize) -> YasonResult<&str> {
+    fn read_string(&self, value_entry_pos: usize) -> YasonResult<&'a str> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
         self.0.read_string(value_pos)
     }
@@ -160,7 +160,7 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
-    fn read_value(&self, index: usize) -> YasonResult<Value> {
+    fn read_value(&self, index: usize) -> YasonResult<Value<'a>> {
         let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
         let data_type = self.0.read_type(value_entry_pos)?;
 
@@ -178,17 +178,18 @@ impl<'a> Array<'a> {
 
 /// An iterator over the array's elements.
 pub struct ArrayIter<'a> {
-    array: &'a Array<'a>,
+    array: Array<'a>,
     len: usize,
     index: usize,
 }
 
 impl<'a> ArrayIter<'a> {
     #[inline]
-    fn try_new(array: &'a Array) -> YasonResult<Self> {
+    fn try_new(yason: &'a Yason) -> YasonResult<ArrayIter<'a>> {
+        let array = Array(yason);
         Ok(Self {
-            array,
             len: array.len()?,
+            array,
             index: 0,
         })
     }
