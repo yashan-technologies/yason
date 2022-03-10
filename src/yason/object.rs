@@ -51,7 +51,7 @@ impl<'a> Object<'a> {
 
     /// Returns the value corresponding to the key, if it exists.
     #[inline]
-    pub fn get<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Value>> {
+    pub fn get<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Value<'a>>> {
         let found = self.find_key(key.as_ref())?;
         if let Some(value_pos) = found {
             return Ok(Some(self.read_value(value_pos)?));
@@ -98,7 +98,7 @@ impl<'a> Object<'a> {
     /// Gets an object for this key if it exists and has the correct type, returns `None` if this
     /// key does not exist, returns `YasonError` otherwise.
     #[inline]
-    pub fn object<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Object>> {
+    pub fn object<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Object<'a>>> {
         let found = self.check_key(key.as_ref(), DataType::Object)?;
 
         if let Some(value_pos) = found {
@@ -110,7 +110,7 @@ impl<'a> Object<'a> {
     /// Gets an array for this key if it exists and has the correct type, returns `None` if this
     /// key does not exist, returns `YasonError` otherwise.
     #[inline]
-    pub fn array<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Array>> {
+    pub fn array<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Array<'a>>> {
         let found = self.check_key(key.as_ref(), DataType::Array)?;
 
         if let Some(value_pos) = found {
@@ -122,7 +122,7 @@ impl<'a> Object<'a> {
     /// Gets a string value for this key if it exists and has the correct type, returns `None` if
     /// this key does not exist, returns `YasonError` otherwise.
     #[inline]
-    pub fn string<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<&str>> {
+    pub fn string<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<&'a str>> {
         let found = self.check_key(key.as_ref(), DataType::String)?;
 
         if let Some(value_pos) = found {

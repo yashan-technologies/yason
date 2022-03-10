@@ -40,7 +40,7 @@ impl<'a> Array<'a> {
 
     /// Gets the element at the given index.
     #[inline]
-    pub fn get(&self, index: usize) -> YasonResult<Value> {
+    pub fn get(&self, index: usize) -> YasonResult<Value<'a>> {
         let element_count = self.len()?;
         if index >= element_count {
             return Err(YasonError::IndexOutOfBounds {
@@ -73,7 +73,7 @@ impl<'a> Array<'a> {
 
     /// Gets an object if the element at the given index has the correct type, returns `YasonError` otherwise.
     #[inline]
-    pub fn object(&self, index: usize) -> YasonResult<Object> {
+    pub fn object(&self, index: usize) -> YasonResult<Object<'a>> {
         let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
         self.0.check_type(value_entry_pos, DataType::Object)?;
         self.read_object(value_entry_pos)
@@ -81,7 +81,7 @@ impl<'a> Array<'a> {
 
     /// Gets an array if the element at the given index has the correct type, returns `YasonError` otherwise.
     #[inline]
-    pub fn array(&self, index: usize) -> YasonResult<Array> {
+    pub fn array(&self, index: usize) -> YasonResult<Array<'a>> {
         let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
         self.0.check_type(value_entry_pos, DataType::Array)?;
         self.read_array(value_entry_pos)
@@ -89,7 +89,7 @@ impl<'a> Array<'a> {
 
     /// Gets a string value if the element at the given index has the correct type, returns `YasonError` otherwise.
     #[inline]
-    pub fn string(&self, index: usize) -> YasonResult<&str> {
+    pub fn string(&self, index: usize) -> YasonResult<&'a str> {
         let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
         self.0.check_type(value_entry_pos, DataType::String)?;
         self.read_string(value_entry_pos)
