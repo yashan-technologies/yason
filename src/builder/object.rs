@@ -154,7 +154,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
     }
 
     #[inline]
-    fn binary_search(target: &str, bytes: &mut Vec<u8>, start_pos: usize, value_count: usize) -> usize {
+    fn binary_search(target: &str, bytes: &[u8], start_pos: usize, value_count: usize) -> usize {
         let begin = start_pos + ELEMENT_COUNT_SIZE;
         let end = begin + value_count * KEY_OFFSET_SIZE;
 

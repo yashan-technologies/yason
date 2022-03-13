@@ -32,6 +32,7 @@ impl<'a> Object<'a> {
     /// # Safety
     ///
     /// Callers should guarantee the `yason` is a valid `Object`.
+    #[inline]
     pub const unsafe fn new_unchecked(yason: &'a Yason) -> Self {
         debug_assert!(yason.bytes.len() >= DATA_TYPE_SIZE + OBJECT_SIZE + ELEMENT_COUNT_SIZE);
         Self(yason)
@@ -312,6 +313,7 @@ impl<'a> ObjectIter<'a> {
 impl<'a> Iterator for ObjectIter<'a> {
     type Item = YasonResult<(&'a str, Value<'a>)>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.len {
             let entry = self.next_entry();
@@ -340,6 +342,7 @@ impl<'a> KeyIter<'a> {
 impl<'a> Iterator for KeyIter<'a> {
     type Item = YasonResult<&'a str>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.inner.index < self.inner.len {
             let key = self.inner.next_key();
@@ -368,6 +371,7 @@ impl<'a> ValueIter<'a> {
 impl<'a> Iterator for ValueIter<'a> {
     type Item = YasonResult<Value<'a>>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.inner.index < self.inner.len {
             let key = self.inner.next_value();

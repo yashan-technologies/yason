@@ -24,6 +24,7 @@ pub enum YasonError {
 }
 
 impl Display for YasonError {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             YasonError::IndexOutOfBounds { len, index } => {
@@ -181,6 +182,7 @@ impl Yason {
         )
     }
 
+    #[allow(clippy::unnecessary_lazy_evaluations)]
     #[inline]
     fn slice(&self, from: usize, to: usize) -> YasonResult<&[u8]> {
         self.bytes.get(from..to).ok_or_else(|| YasonError::IndexOutOfBounds {

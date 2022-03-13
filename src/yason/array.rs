@@ -198,6 +198,7 @@ impl<'a> ArrayIter<'a> {
 impl<'a> Iterator for ArrayIter<'a> {
     type Item = YasonResult<Value<'a>>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.len {
             let value = self.array.read_value(self.index);
