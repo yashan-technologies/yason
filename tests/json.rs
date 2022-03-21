@@ -139,8 +139,13 @@ fn assert_value(value: Value, expected: &mut TestValue) {
 
 #[test]
 fn test_array() {
-    let input = r#"["John Doe", 43, true, null, [2345678], {"key": true}]"#;
+    let input = r#"[]"#;
+    let expected = vec![];
+    let yason = YasonBuf::parse(input).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Array);
+    assert_array(yason.array().unwrap(), &mut TestValue::Array(expected));
 
+    let input = r#"["John Doe", 43, true, null, [2345678], {"key": true}]"#;
     let expected = vec![
         TestValue::Scalar((DataType::String, "John Doe".to_string())),
         TestValue::Scalar((DataType::Number, "43".to_string())),
@@ -160,6 +165,21 @@ fn test_array() {
 
 #[test]
 fn test_object() {
+    let input = r#"{}"#;
+    let expected = vec![];
+    let yason = YasonBuf::parse(input).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Object);
+    assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
+
+    let input = r#"{"key": 123}"#;
+    let expected = vec![(
+        "key".to_string(),
+        TestValue::Scalar((DataType::Number, "123".to_string())),
+    )];
+    let yason = YasonBuf::parse(input).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Object);
+    assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
+
     let input = r#"{
         "name": "John Doe",
         "age": 43,
@@ -168,7 +188,6 @@ fn test_object() {
         "phone": [2345678],
         "object": {"key": true}
     }"#;
-
     let expected = vec![
         (
             "name".to_string(),

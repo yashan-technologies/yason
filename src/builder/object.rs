@@ -67,6 +67,10 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
 
     #[inline]
     fn key_sorted(&mut self) -> bool {
+        if self.element_count <= 1 {
+            return true;
+        }
+
         let left = self.start_pos + ELEMENT_COUNT_SIZE;
         let right = left + self.element_count as usize * KEY_OFFSET_SIZE;
 
