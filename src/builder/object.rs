@@ -71,24 +71,18 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
             return true;
         }
 
-        let left = self.start_pos + ELEMENT_COUNT_SIZE;
-        let right = left + self.element_count as usize * KEY_OFFSET_SIZE;
+        let begin = self.start_pos + ELEMENT_COUNT_SIZE;
+        let end = begin + self.element_count as usize * KEY_OFFSET_SIZE;
 
         let bytes = self.bytes.as_mut();
-        let key_offsets_bytes = bytes[left..right].as_mut_ptr() as *mut u32;
-        let key_offsets = unsafe { std::slice::from_raw_parts(key_offsets_bytes, (right - left) / 4) };
+        let key_offsets_bytes = bytes[begin..end].as_mut_ptr() as *mut u32;
+        let key_offsets = unsafe { std::slice::from_raw_parts(key_offsets_bytes, (end - begin) / 4) };
 
         for i in 0..key_offsets.len() - 1 {
-            let left_key = Self::read_key_by_offset(bytes, key_offsets[i] as usize, self.start_pos);
-            let right_key = Self::read_key_by_offset(bytes, key_offsets[i + 1] as usize, self.start_pos);
-            if left_key.len() > right_key.len() {
+            let cur_key = Self::read_key_by_offset(bytes, key_offsets[i] as usize, self.start_pos);
+            let next_key = Self::read_key_by_offset(bytes, key_offsets[i + 1] as usize, self.start_pos);
+            if cur_key.len() > next_key.len() || (cur_key.len() == next_key.len() && cur_key > next_key) {
                 return false;
-            } else if left_key.len() < right_key.len() {
-                continue;
-            } else if left_key > right_key {
-                return false;
-            } else {
-                continue;
             }
         }
         true
