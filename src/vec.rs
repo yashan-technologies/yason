@@ -25,7 +25,7 @@ pub trait VecExt: Sized {
     fn push_data_length(&mut self, length: usize) -> BuildResult<()>;
     fn push_key(&mut self, s: &str);
     fn push_string(&mut self, s: &str) -> BuildResult<()>;
-    fn push_number(&mut self, value: Number);
+    fn push_number(&mut self, value: &Number);
 }
 
 impl VecExt for Vec<u8> {
@@ -141,7 +141,7 @@ impl VecExt for Vec<u8> {
     }
 
     #[inline]
-    fn push_number(&mut self, value: Number) {
+    fn push_number(&mut self, value: &Number) {
         let length_pos = self.len();
         let value_pos = length_pos + NUMBER_LENGTH_SIZE;
         let new_len = value_pos + MAX_BINARY_SIZE;

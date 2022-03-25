@@ -214,7 +214,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
     }
 
     #[inline]
-    fn push_number(&mut self, key: &str, value: Number) -> BuildResult<()> {
+    fn push_number(&mut self, key: &str, value: &Number) -> BuildResult<()> {
         let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + NUMBER_LENGTH_SIZE + MAX_BINARY_SIZE;
         let f = |bytes: &mut Vec<u8>| {
             bytes.push_data_type(DataType::Number);
@@ -306,7 +306,7 @@ pub trait ObjBuilder {
     fn push_string<Key: AsRef<str>, Val: AsRef<str>>(&mut self, key: Key, value: Val) -> BuildResult<&mut Self>;
 
     /// Pushes a number value.
-    fn push_number<Key: AsRef<str>>(&mut self, key: Key, value: Number) -> BuildResult<&mut Self>;
+    fn push_number<Key: AsRef<str>, Num: AsRef<Number>>(&mut self, key: Key, value: Num) -> BuildResult<&mut Self>;
 
     /// Pushes a bool value.
     fn push_bool<Key: AsRef<str>>(&mut self, key: Key, value: bool) -> BuildResult<&mut Self>;
@@ -353,9 +353,9 @@ macro_rules! impl_push_methods {
 
         /// Pushes a number value.
         #[inline]
-        $v fn push_number<Key: AsRef<str>>(&mut self, key: Key, value: Number) -> BuildResult<&mut Self> {
+        $v fn push_number<Key: AsRef<str>, Num: AsRef<Number>>(&mut self, key: Key, value: Num) -> BuildResult<&mut Self> {
             let key = key.as_ref();
-            self.0.push_number(key, value)?;
+            self.0.push_number(key, value.as_ref())?;
             Ok(self)
         }
 

@@ -133,7 +133,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
-    fn push_number(&mut self, value: Number) -> BuildResult<()> {
+    fn push_number(&mut self, value: &Number) -> BuildResult<()> {
         let size = MAX_BINARY_SIZE + NUMBER_LENGTH_SIZE;
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
             bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
@@ -214,7 +214,7 @@ pub trait ArrBuilder {
     fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self>;
 
     /// Pushes a number value.
-    fn push_number(&mut self, value: Number) -> BuildResult<&mut Self>;
+    fn push_number<Num: AsRef<Number>>(&mut self, value: Num) -> BuildResult<&mut Self>;
 
     /// Pushes a bool value.
     fn push_bool(&mut self, value: bool) -> BuildResult<&mut Self>;
@@ -249,8 +249,8 @@ macro_rules! impl_push_methods {
 
         /// Pushes a number value.
         #[inline]
-        $v fn push_number(&mut self, value: Number) -> BuildResult<&mut Self> {
-            self.0.push_number(value)?;
+        $v fn push_number<Num: AsRef<Number>>(&mut self, value: Num) -> BuildResult<&mut Self> {
+            self.0.push_number(value.as_ref())?;
             Ok(self)
         }
 

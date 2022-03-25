@@ -12,7 +12,7 @@ homepage = "https://github.com/cod-technologies/yason"
 documentation = "https://docs.rs/yason/"
 
 [dependencies]
-decimal-rs = "0.1.31"
+decimal-rs = "0.1.34"
 serde_json = {version = "1.0.79", features = ["arbitrary_precision"]}
 
 [dev-dependencies]

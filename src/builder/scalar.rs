@@ -34,7 +34,7 @@ impl Scalar {
 
     /// Encodes a number value.
     #[inline]
-    pub fn number(value: Number) -> BuildResult<YasonBuf> {
+    pub fn number<Num: AsRef<Number>>(value: Num) -> BuildResult<YasonBuf> {
         let mut bytes = Vec::new();
         Scalar::number_with_vec(value, &mut bytes)?;
         Ok(unsafe { YasonBuf::new_unchecked(bytes) })
@@ -42,12 +42,12 @@ impl Scalar {
 
     /// Encodes a number value into the provided vector.
     #[inline]
-    pub fn number_with_vec(value: Number, bytes: &mut Vec<u8>) -> BuildResult<&Yason> {
+    pub fn number_with_vec<Num: AsRef<Number>>(value: Num, bytes: &mut Vec<u8>) -> BuildResult<&Yason> {
         let init_len = bytes.len();
         let size = DATA_TYPE_SIZE + NUMBER_LENGTH_SIZE + MAX_BINARY_SIZE;
         bytes.try_reserve(size)?;
         bytes.push_data_type(DataType::Number);
-        bytes.push_number(value);
+        bytes.push_number(value.as_ref());
         Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
     }
 
