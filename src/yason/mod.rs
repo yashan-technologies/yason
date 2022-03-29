@@ -7,11 +7,13 @@ pub use crate::yason::array::{Array, ArrayIter};
 pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 
 use crate::binary::{DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE};
+use crate::format::LazyFormat;
 use crate::util::decode_varint;
 use crate::{DataType, Number};
 use std::borrow::Borrow;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt;
+use std::fmt::Display;
 use std::mem::size_of;
 use std::ops::Deref;
 
@@ -23,9 +25,9 @@ pub enum YasonError {
     InvalidDataType(u8),
 }
 
-impl Display for YasonError {
+impl fmt::Display for YasonError {
     #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             YasonError::IndexOutOfBounds { len, index } => {
                 write!(f, "index out of bounds: the len is {} but the index is {}", len, index)
@@ -147,10 +149,22 @@ impl Yason {
         self.read_string(DATA_TYPE_SIZE)
     }
 
+    #[inline]
+    pub(crate) unsafe fn string_unchecked(&self) -> YasonResult<&str> {
+        debug_assert!(self.data_type()? == DataType::String);
+        self.read_string(DATA_TYPE_SIZE)
+    }
+
     /// If `Yason` is `Number`, return its value. Returns `YasonError` otherwise.
     #[inline]
     pub fn number(&self) -> YasonResult<Number> {
         self.check_type(0, DataType::Number)?;
+        self.read_number(DATA_TYPE_SIZE)
+    }
+
+    #[inline]
+    pub(crate) unsafe fn number_unchecked(&self) -> YasonResult<Number> {
+        debug_assert!(self.data_type()? == DataType::Number);
         self.read_number(DATA_TYPE_SIZE)
     }
 
@@ -161,10 +175,22 @@ impl Yason {
         Ok(self.read_u8(DATA_TYPE_SIZE)? == 1)
     }
 
+    #[inline]
+    pub(crate) unsafe fn bool_unchecked(&self) -> YasonResult<bool> {
+        debug_assert!(self.data_type()? == DataType::Bool);
+        Ok(self.read_u8(DATA_TYPE_SIZE)? == 1)
+    }
+
     /// If `Yason` is `Null`, return true. Returns false otherwise.
     #[inline]
     pub fn is_null(&self) -> YasonResult<bool> {
         self.is_type(0, DataType::Null as u8)
+    }
+
+    /// Formats the yason as a compact or pretty string.
+    #[inline]
+    pub fn format(&self, pretty: bool) -> impl Display + '_ {
+        LazyFormat::new(self, pretty)
     }
 }
 
@@ -211,7 +237,7 @@ impl Yason {
     }
 
     #[inline]
-    fn read_u8(&self, index: usize) -> YasonResult<u8> {
+    pub(crate) fn read_u8(&self, index: usize) -> YasonResult<u8> {
         self.get(index)
     }
 
@@ -232,7 +258,7 @@ impl Yason {
     }
 
     #[inline]
-    fn read_string(&self, pos: usize) -> YasonResult<&str> {
+    pub(crate) fn read_string(&self, pos: usize) -> YasonResult<&str> {
         let (data_length, data_length_len) = decode_varint(&self.bytes, pos)?;
         let end = pos + data_length_len + data_length as usize;
         let bytes = self.slice(pos + data_length_len, end)?;
@@ -241,7 +267,7 @@ impl Yason {
     }
 
     #[inline]
-    fn read_number(&self, index: usize) -> YasonResult<Number> {
+    pub(crate) fn read_number(&self, index: usize) -> YasonResult<Number> {
         let data_length = self.get(index)? as usize;
         let end = index + NUMBER_LENGTH_SIZE + data_length;
         let bytes = self.slice(index + NUMBER_LENGTH_SIZE, end)?;
@@ -281,6 +307,22 @@ impl<'a> Value<'a> {
             Value::Number(_) => DataType::Number,
             Value::Bool(_) => DataType::Bool,
             Value::Null => DataType::Null,
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Yason> for Value<'a> {
+    type Error = YasonError;
+
+    #[inline]
+    fn try_from(yason: &'a Yason) -> Result<Self, Self::Error> {
+        match yason.data_type()? {
+            DataType::Object => Ok(Value::Object(unsafe { Object::new_unchecked(yason) })),
+            DataType::Array => Ok(Value::Array(unsafe { Array::new_unchecked(yason) })),
+            DataType::String => Ok(Value::String(unsafe { yason.string_unchecked()? })),
+            DataType::Number => Ok(Value::Number(unsafe { yason.number_unchecked()? })),
+            DataType::Bool => Ok(Value::Bool(unsafe { yason.bool_unchecked()? })),
+            DataType::Null => Ok(Value::Null),
         }
     }
 }
