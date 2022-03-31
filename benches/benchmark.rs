@@ -2,7 +2,7 @@
 
 use bencher::{benchmark_group, benchmark_main, black_box, Bencher};
 use std::cmp::Ordering;
-use yason::{Array, ArrayRefBuilder, Number, Object, ObjectRefBuilder};
+use yason::{Array, ArrayRefBuilder, Number, Object, ObjectRefBuilder, PathExpression, YasonBuf};
 
 fn bench_push_string(bench: &mut Bencher) {
     let mut bytes = Vec::with_capacity(1024);
@@ -233,6 +233,16 @@ fn bench_sort_new_builder(bench: &mut Bencher) {
     bench.iter(|| inner(&keys, &mut bytes))
 }
 
+fn bench_query(bench: &mut Bencher) {
+    let input = r#"{"key1": 123, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789, "key3": {"key6": 123}}, [10, false, null]], "key5": {"key1": true, "key2": 789, "key3": null}}"#;
+    let path = "$.key4[last - 20, last - 2, 2 to 4, 0].*[0]..key2.type()";
+    let yason_buf = YasonBuf::parse(input).unwrap();
+    let yason = yason_buf.as_ref();
+    let path = str::parse::<PathExpression>(path).unwrap();
+
+    bench.iter(|| path.query(yason, true, None, None).unwrap())
+}
+
 benchmark_group!(
     yason_benches,
     bench_push_string,
@@ -254,6 +264,7 @@ benchmark_group!(
     bench_array_read_null,
     bench_array_read_array,
     bench_array_read_object,
+    bench_query,
 );
 
 benchmark_main!(yason_benches);

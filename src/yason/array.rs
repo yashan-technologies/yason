@@ -6,6 +6,8 @@ use crate::yason::{Value, Yason, YasonError, YasonResult};
 use crate::{DataType, Number};
 
 /// An array in yason binary format.
+#[derive(Clone)]
+#[repr(transparent)]
 pub struct Array<'a>(&'a Yason);
 
 impl<'a> Array<'a> {
@@ -32,6 +34,11 @@ impl<'a> Array<'a> {
         Ok(self.0.read_u16(DATA_TYPE_SIZE + ARRAY_SIZE)? as usize)
     }
 
+    #[inline]
+    pub fn yason(&self) -> &Yason {
+        self.0
+    }
+
     /// Returns true if the array contains no elements.
     #[inline]
     pub fn is_empty(&self) -> YasonResult<bool> {
@@ -48,6 +55,12 @@ impl<'a> Array<'a> {
                 index,
             });
         }
+        self.read_value(index)
+    }
+
+    /// Gets the element at the given index.
+    #[inline]
+    pub(crate) unsafe fn get_unchecked(&self, index: usize) -> YasonResult<Value<'a>> {
         self.read_value(index)
     }
 

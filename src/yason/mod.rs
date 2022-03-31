@@ -9,8 +9,9 @@ pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 use crate::binary::{DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE};
 use crate::format::LazyFormat;
 use crate::util::decode_varint;
-use crate::{DataType, Number};
+use crate::{BuildError, DataType, Number, Scalar};
 use std::borrow::Borrow;
+use std::collections::TryReserveError;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Display;
@@ -23,6 +24,9 @@ pub enum YasonError {
     IndexOutOfBounds { len: usize, index: usize },
     UnexpectedType { expected: DataType, actual: DataType },
     InvalidDataType(u8),
+    MultiValuesWithoutWrapper,
+    TryReserveError(TryReserveError),
+    InvalidPathExpression,
 }
 
 impl fmt::Display for YasonError {
@@ -36,6 +40,21 @@ impl fmt::Display for YasonError {
                 write!(f, "data type mismatch, expect {}, but actual {}", expected, actual)
             }
             YasonError::InvalidDataType(e) => write!(f, "invalid data type value '{}'", e),
+            YasonError::MultiValuesWithoutWrapper => {
+                write!(f, "multiple values cannot be returned without array wrapper")
+            }
+            YasonError::TryReserveError(e) => write!(f, "{}", e),
+            YasonError::InvalidPathExpression => write!(f, "invalid path expression"),
+        }
+    }
+}
+
+impl From<BuildError> for YasonError {
+    #[inline]
+    fn from(err: BuildError) -> Self {
+        match err {
+            BuildError::TryReserveError(e) => YasonError::TryReserveError(e),
+            _ => unreachable!(),
         }
     }
 }
@@ -93,6 +112,7 @@ impl ToOwned for Yason {
     #[inline]
     fn to_owned(&self) -> YasonBuf {
         self.to_yason_buf()
+            .expect("an out-of-memory error occurred when converting a yason")
     }
 }
 
@@ -116,10 +136,14 @@ impl Yason {
     }
 
     #[inline]
-    pub fn to_yason_buf(&self) -> YasonBuf {
-        YasonBuf {
-            bytes: self.bytes.to_vec(),
-        }
+    pub fn to_yason_buf(&self) -> YasonResult<YasonBuf> {
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve(self.bytes.len())
+            .map_err(YasonError::TryReserveError)?;
+        bytes.extend_from_slice(&self.bytes);
+
+        Ok(YasonBuf { bytes })
     }
 
     #[inline]
@@ -192,6 +216,11 @@ impl Yason {
     pub fn format(&self, pretty: bool) -> impl Display + '_ {
         LazyFormat::new(self, pretty)
     }
+
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 
 impl Yason {
@@ -237,7 +266,7 @@ impl Yason {
     }
 
     #[inline]
-    pub(crate) fn read_u8(&self, index: usize) -> YasonResult<u8> {
+    fn read_u8(&self, index: usize) -> YasonResult<u8> {
         self.get(index)
     }
 
@@ -258,7 +287,7 @@ impl Yason {
     }
 
     #[inline]
-    pub(crate) fn read_string(&self, pos: usize) -> YasonResult<&str> {
+    fn read_string(&self, pos: usize) -> YasonResult<&str> {
         let (data_length, data_length_len) = decode_varint(&self.bytes, pos)?;
         let end = pos + data_length_len + data_length as usize;
         let bytes = self.slice(pos + data_length_len, end)?;
@@ -267,7 +296,7 @@ impl Yason {
     }
 
     #[inline]
-    pub(crate) fn read_number(&self, index: usize) -> YasonResult<Number> {
+    fn read_number(&self, index: usize) -> YasonResult<Number> {
         let data_length = self.get(index)? as usize;
         let end = index + NUMBER_LENGTH_SIZE + data_length;
         let bytes = self.slice(index + NUMBER_LENGTH_SIZE, end)?;
@@ -288,6 +317,7 @@ impl Yason {
 }
 
 /// Possible yason value corresponding to the data type.
+#[derive(Clone)]
 pub enum Value<'a> {
     Object(Object<'a>),
     Array(Array<'a>),
@@ -307,6 +337,18 @@ impl<'a> Value<'a> {
             Value::Number(_) => DataType::Number,
             Value::Bool(_) => DataType::Bool,
             Value::Null => DataType::Null,
+        }
+    }
+
+    #[inline]
+    pub fn try_to_yason(&self, buf: &'a mut Vec<u8>) -> YasonResult<&Yason> {
+        match self {
+            Value::Object(object) => Ok(object.yason()),
+            Value::Array(array) => Ok(array.yason()),
+            Value::String(str) => Ok(Scalar::string_with_vec(str, buf)?),
+            Value::Number(num) => Ok(Scalar::number_with_vec(num, buf)?),
+            Value::Bool(bool) => Ok(Scalar::bool_with_vec(*bool, buf)?),
+            Value::Null => Ok(Scalar::null_with_vec(buf)?),
         }
     }
 }

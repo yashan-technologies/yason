@@ -6,6 +6,8 @@ use crate::yason::{Value, Yason, YasonResult};
 use crate::{DataType, Number};
 
 /// An object in yason binary format.
+#[derive(Clone)]
+#[repr(transparent)]
 pub struct Object<'a>(&'a Yason);
 
 impl<'a> Object<'a> {
@@ -42,6 +44,11 @@ impl<'a> Object<'a> {
     #[inline]
     pub fn len(&self) -> YasonResult<usize> {
         Ok(self.0.read_u16(DATA_TYPE_SIZE + OBJECT_SIZE)? as usize)
+    }
+
+    #[inline]
+    pub fn yason(&self) -> &Yason {
+        self.0
     }
 
     /// Returns true if the object contains no elements.

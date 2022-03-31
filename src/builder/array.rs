@@ -159,6 +159,19 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
         // null can be inlined
         self.push_value(DataType::Null, |_, _, _| Ok(()))
     }
+
+    #[inline]
+    unsafe fn push_object_or_array(&mut self, yason: &Yason, data_type: DataType) -> BuildResult<()> {
+        let value = yason.as_bytes();
+        let size = value.len();
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.extend_from_slice(value);
+            Ok(())
+        };
+        self.push_value(data_type, f)
+    }
 }
 
 /// Builder for encoding an array.
@@ -200,6 +213,14 @@ impl<'a> ArrayRefBuilder<'a> {
         let bytes_init_len = self.0.finish()?;
         let bytes = self.0.bytes;
         Ok(unsafe { Yason::new_unchecked(&bytes[bytes_init_len..]) })
+    }
+
+    #[inline]
+    pub(crate) unsafe fn push_object_or_array(&mut self, yason: &Yason, data_type: DataType) -> BuildResult<&mut Self> {
+        debug_assert!(matches!(yason.data_type().unwrap(), DataType::Object | DataType::Array));
+        debug_assert!(yason.data_type().unwrap() == data_type);
+        self.0.push_object_or_array(yason, data_type)?;
+        Ok(self)
     }
 }
 

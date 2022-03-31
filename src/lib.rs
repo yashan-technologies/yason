@@ -177,6 +177,7 @@ mod builder;
 mod data_type;
 mod format;
 mod json;
+mod path;
 mod util;
 mod vec;
 mod yason;
@@ -185,6 +186,7 @@ pub use self::{
     builder::{ArrayBuilder, ArrayRefBuilder, BuildError, NumberError, ObjectBuilder, ObjectRefBuilder, Scalar},
     data_type::{DataType, InvalidDataType},
     format::FormatError,
+    path::{PathExpression, PathParseError, QueriedValue},
     yason::{Array, ArrayIter, KeyIter, Object, ObjectIter, Value, ValueIter, Yason, YasonBuf, YasonError},
 };
 pub use decimal_rs::Decimal as Number;
