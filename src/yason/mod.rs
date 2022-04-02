@@ -196,13 +196,13 @@ impl Yason {
     #[inline]
     pub fn bool(&self) -> YasonResult<bool> {
         self.check_type(0, DataType::Bool)?;
-        Ok(self.read_u8(DATA_TYPE_SIZE)? == 1)
+        self.read_bool(DATA_TYPE_SIZE)
     }
 
     #[inline]
     pub(crate) unsafe fn bool_unchecked(&self) -> YasonResult<bool> {
         debug_assert!(self.data_type()? == DataType::Bool);
-        Ok(self.read_u8(DATA_TYPE_SIZE)? == 1)
+        self.read_bool(DATA_TYPE_SIZE)
     }
 
     /// If `Yason` is `Null`, return true. Returns false otherwise.
@@ -304,6 +304,11 @@ impl Yason {
     }
 
     #[inline]
+    fn read_bool(&self, index: usize) -> YasonResult<bool> {
+        Ok(self.read_u8(index)? == 1)
+    }
+
+    #[inline]
     fn check_type(&self, index: usize, expected: DataType) -> YasonResult<()> {
         if !self.is_type(index, expected as u8)? {
             return Err(YasonError::UnexpectedType {
@@ -366,5 +371,108 @@ impl<'a> TryFrom<&'a Yason> for Value<'a> {
             DataType::Bool => Ok(Value::Bool(unsafe { yason.bool_unchecked()? })),
             DataType::Null => Ok(Value::Null),
         }
+    }
+}
+
+/// IN_ARRAY: this parameter indicates whether this value is in an array and affects how data is
+/// read from value_pos (related to `Yason binary format`).
+/// Note:
+///   1. IN_ARRAY of a LazyValue generated from the outermost Array is still false.
+///   2. IN_ARRAY is true only if this LazyValue is generated from an Array's Iter.
+pub struct LazyValue<'a, const IN_ARRAY: bool> {
+    yason: &'a Yason,
+    ty: DataType,
+    value_pos: usize,
+}
+
+impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
+    #[inline]
+    const fn new(yason: &'a Yason, ty: DataType, value_pos: usize) -> Self {
+        Self { yason, ty, value_pos }
+    }
+
+    #[inline]
+    pub const fn data_type(&self) -> DataType {
+        self.ty
+    }
+
+    #[inline]
+    pub fn value(&self) -> YasonResult<Value<'a>> {
+        let res = unsafe {
+            match self.ty {
+                DataType::Object => Value::Object(self.object()?),
+                DataType::Array => Value::Array(self.array()?),
+                DataType::String => Value::String(self.string()?),
+                DataType::Number => Value::Number(self.number()?),
+                DataType::Bool => Value::Bool(self.bool()?),
+                DataType::Null => Value::Null,
+            }
+        };
+
+        Ok(res)
+    }
+
+    #[inline]
+    pub unsafe fn object(&self) -> YasonResult<Object<'a>> {
+        debug_assert!(self.ty == DataType::Object);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_object(self.value_pos)
+        } else {
+            Object::new_unchecked(self.yason).read_object(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn array(&self) -> YasonResult<Array<'a>> {
+        debug_assert!(self.ty == DataType::Array);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_array(self.value_pos)
+        } else {
+            Object::new_unchecked(self.yason).read_array(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn string(&self) -> YasonResult<&'a str> {
+        debug_assert!(self.ty == DataType::String);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_string(self.value_pos)
+        } else {
+            self.yason.read_string(self.value_pos + DATA_TYPE_SIZE)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn number(&self) -> YasonResult<Number> {
+        debug_assert!(self.ty == DataType::Number);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_number(self.value_pos)
+        } else {
+            self.yason.read_number(self.value_pos + DATA_TYPE_SIZE)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn bool(&self) -> YasonResult<bool> {
+        debug_assert!(self.ty == DataType::Bool);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_bool(self.value_pos)
+        } else {
+            self.yason.read_bool(self.value_pos + DATA_TYPE_SIZE)
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Yason> for LazyValue<'a, false> {
+    type Error = YasonError;
+
+    #[inline]
+    fn try_from(yason: &'a Yason) -> Result<Self, Self::Error> {
+        let data_type = yason.data_type()?;
+        Ok(Self {
+            yason,
+            ty: data_type,
+            value_pos: 0,
+        })
     }
 }

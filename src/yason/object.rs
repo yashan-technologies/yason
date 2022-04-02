@@ -2,7 +2,7 @@
 
 use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, KEY_LENGTH_SIZE, KEY_OFFSET_SIZE, OBJECT_SIZE};
 use crate::yason::array::Array;
-use crate::yason::{Value, Yason, YasonResult};
+use crate::yason::{LazyValue, Value, Yason, YasonResult};
 use crate::{DataType, Number};
 
 /// An object in yason binary format.
@@ -27,6 +27,11 @@ impl<'a> Object<'a> {
     #[inline]
     pub fn value_iter(&self) -> YasonResult<ValueIter<'a>> {
         ValueIter::try_new(self.0)
+    }
+
+    #[inline]
+    pub(crate) fn lazy_value_iter(&self) -> YasonResult<LazyObjectValueIter<'a>> {
+        LazyObjectValueIter::try_new(self.0)
     }
 
     /// Creates an `Object`.
@@ -63,6 +68,17 @@ impl<'a> Object<'a> {
         let found = self.find_key(key.as_ref())?;
         if let Some(value_pos) = found {
             return Ok(Some(self.read_value(value_pos)?));
+        }
+
+        Ok(None)
+    }
+
+    #[inline]
+    pub(crate) fn lazy_get<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<LazyValue<'a, false>>> {
+        let found = self.find_key(key.as_ref())?;
+        if let Some(value_pos) = found {
+            let data_type = self.0.read_type(value_pos)?;
+            return Ok(Some(LazyValue::new(self.0, data_type, value_pos)));
         }
 
         Ok(None)
@@ -194,14 +210,14 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    fn read_object(&self, value_pos: usize) -> YasonResult<Object<'a>> {
+    pub(crate) fn read_object(&self, value_pos: usize) -> YasonResult<Object<'a>> {
         let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
         Ok(unsafe { Object::new_unchecked(yason) })
     }
 
     #[inline]
-    fn read_array(&self, value_pos: usize) -> YasonResult<Array<'a>> {
+    pub(crate) fn read_array(&self, value_pos: usize) -> YasonResult<Array<'a>> {
         let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
         Ok(unsafe { Array::new_unchecked(yason) })
@@ -219,7 +235,7 @@ impl<'a> Object<'a> {
 
     #[inline]
     fn read_bool(&self, value_pos: usize) -> YasonResult<bool> {
-        Ok(self.0.read_u8(value_pos + DATA_TYPE_SIZE)? == 1)
+        self.0.read_bool(value_pos + DATA_TYPE_SIZE)
     }
 
     #[inline]
@@ -270,6 +286,32 @@ impl<'a> Object<'a> {
         }
         Ok(None)
     }
+
+    #[inline]
+    unsafe fn nth_key_offset(&self, index: usize) -> YasonResult<u32> {
+        debug_assert!(index < self.len()?);
+        let key_offset_pos = DATA_TYPE_SIZE + OBJECT_SIZE + ELEMENT_COUNT_SIZE + index * KEY_OFFSET_SIZE;
+        self.read_key_offset(key_offset_pos)
+    }
+
+    #[inline]
+    unsafe fn read_nth_value_pos(&self, index: usize) -> YasonResult<usize> {
+        let key_offset = self.nth_key_offset(index)?;
+        self.skip_key(key_offset as usize)
+    }
+
+    #[inline]
+    unsafe fn read_nth_key_and_value_pos(&self, index: usize) -> YasonResult<(&'a str, usize)> {
+        let key_offset = self.nth_key_offset(index)?;
+        self.read_key(key_offset as usize)
+    }
+
+    #[inline]
+    unsafe fn read_nth_type_and_value_pos(&self, index: usize) -> YasonResult<(DataType, usize)> {
+        let value_pos = self.read_nth_value_pos(index)?;
+        let data_type = self.0.read_type(value_pos)?;
+        Ok((data_type, value_pos))
+    }
 }
 
 /// An iterator over the object's entries.
@@ -292,26 +334,19 @@ impl<'a> ObjectIter<'a> {
 
     #[inline]
     fn next_entry(&mut self) -> YasonResult<(&'a str, Value<'a>)> {
-        let key_offset_pos = DATA_TYPE_SIZE + OBJECT_SIZE + ELEMENT_COUNT_SIZE + self.index * KEY_OFFSET_SIZE;
-        let key_offset = self.object.read_key_offset(key_offset_pos)?;
-        let (key, value_pos) = self.object.read_key(key_offset as usize)?;
+        let (key, value_pos) = unsafe { self.object.read_nth_key_and_value_pos(self.index)? };
         let value = self.object.read_value(value_pos)?;
         Ok((key, value))
     }
 
     #[inline]
     fn next_key(&mut self) -> YasonResult<&'a str> {
-        let key_offset_pos = DATA_TYPE_SIZE + OBJECT_SIZE + ELEMENT_COUNT_SIZE + self.index * KEY_OFFSET_SIZE;
-        let key_offset = self.object.read_key_offset(key_offset_pos)?;
-        let (key, _) = self.object.read_key(key_offset as usize)?;
-        Ok(key)
+        Ok(unsafe { self.object.read_nth_key_and_value_pos(self.index)?.0 })
     }
 
     #[inline]
     fn next_value(&mut self) -> YasonResult<Value<'a>> {
-        let key_offset_pos = DATA_TYPE_SIZE + OBJECT_SIZE + ELEMENT_COUNT_SIZE + self.index * KEY_OFFSET_SIZE;
-        let key_offset = self.object.read_key_offset(key_offset_pos)?;
-        let value_pos = self.object.skip_key(key_offset as usize)?;
+        let value_pos = unsafe { self.object.read_nth_value_pos(self.index)? };
         let value = self.object.read_value(value_pos)?;
         Ok(value)
     }
@@ -384,6 +419,44 @@ impl<'a> Iterator for ValueIter<'a> {
             let key = self.inner.next_value();
             self.inner.index += 1;
             Some(key)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct LazyObjectValueIter<'a> {
+    object: Object<'a>,
+    len: usize,
+    index: usize,
+}
+
+impl<'a> LazyObjectValueIter<'a> {
+    #[inline]
+    fn try_new(yason: &'a Yason) -> YasonResult<LazyObjectValueIter<'a>> {
+        let object = Object(yason);
+        Ok(Self {
+            len: object.len()?,
+            object,
+            index: 0,
+        })
+    }
+
+    #[inline]
+    fn next(&mut self) -> YasonResult<LazyValue<'a, false>> {
+        let (data_type, value_pos) = unsafe { self.object.read_nth_type_and_value_pos(self.index)? };
+        self.index += 1;
+        Ok(LazyValue::new(self.object.0, data_type, value_pos))
+    }
+}
+
+impl<'a> Iterator for LazyObjectValueIter<'a> {
+    type Item = YasonResult<LazyValue<'a, false>>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.len {
+            Some(self.next())
         } else {
             None
         }

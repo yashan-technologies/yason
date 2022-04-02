@@ -2,8 +2,8 @@
 
 use crate::path::parse::{ArrayStep, FuncStep, ObjectStep, SingleIndex, SingleStep, Step};
 use crate::path::push_value;
-use crate::yason::YasonResult;
-use crate::{Number, Value, YasonError};
+use crate::yason::{LazyValue, YasonResult};
+use crate::{DataType, Number, Value, Yason, YasonError};
 use std::cmp::Ordering;
 
 pub struct Selector<'a, 'b> {
@@ -25,7 +25,17 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    pub fn query(&mut self, value: Value<'a>, step_index: usize) -> YasonResult<bool> {
+    pub fn query(&mut self, value: &'a Yason, step_index: usize) -> YasonResult<bool> {
+        let lazy_value = LazyValue::try_from(value)?;
+        self.query_internal(lazy_value, step_index)
+    }
+
+    #[inline]
+    fn query_internal<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+    ) -> YasonResult<bool> {
         debug_assert!(step_index <= self.steps.len());
 
         if step_index == self.steps.len() {
@@ -33,7 +43,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                 if !self.with_wrapper && !self.query_buf.is_empty() {
                     return Err(YasonError::MultiValuesWithoutWrapper);
                 }
-                push_value(self.query_buf, value)?;
+
+                push_value(self.query_buf, value.value()?)?;
             }
             return Ok(true);
         }
@@ -58,17 +69,24 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    fn object_key_match(&mut self, value: Value<'a>, step_index: usize, key: &'b str) -> YasonResult<bool> {
-        match value {
-            Value::Object(object) => {
-                let val = object.get(key)?;
+    fn object_key_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+        key: &'b str,
+    ) -> YasonResult<bool> {
+        match value.data_type() {
+            DataType::Object => {
+                let object = unsafe { value.object()? };
+                let val = object.lazy_get(key)?;
                 if let Some(v) = val {
-                    return self.query(v, step_index + 1);
+                    return self.query_internal(v, step_index + 1);
                 }
             }
-            Value::Array(array) => {
-                for val in array.iter()? {
-                    let found = self.query(val?, step_index)?;
+            DataType::Array => {
+                let array = unsafe { value.array()? };
+                for val in array.lazy_iter()? {
+                    let found = self.query_internal(val?, step_index)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
@@ -80,19 +98,25 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    fn object_wildcard_match(&mut self, value: Value<'a>, step_index: usize) -> YasonResult<bool> {
-        match value {
-            Value::Object(object) => {
-                for val in object.value_iter()? {
-                    let found = self.query(val?, step_index + 1)?;
+    fn object_wildcard_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+    ) -> YasonResult<bool> {
+        match value.data_type() {
+            DataType::Object => {
+                let object = unsafe { value.object()? };
+                for val in object.lazy_value_iter()? {
+                    let found = self.query_internal(val?, step_index + 1)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
                 }
             }
-            Value::Array(array) => {
-                for val in array.iter()? {
-                    let found = self.query(val?, step_index)?;
+            DataType::Array => {
+                let array = unsafe { value.array()? };
+                for val in array.lazy_iter()? {
+                    let found = self.query_internal(val?, step_index)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
@@ -100,21 +124,28 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {}
         }
+
         Ok(false)
     }
 
     #[inline]
-    fn array_index_match(&mut self, value: Value<'a>, step_index: usize, index: usize) -> YasonResult<bool> {
-        match value {
-            Value::Array(array) => {
+    fn array_index_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+        index: usize,
+    ) -> YasonResult<bool> {
+        match value.data_type() {
+            DataType::Array => {
+                let array = unsafe { value.array()? };
                 if index < array.len()? {
-                    let val = array.get(index)?;
-                    return self.query(val, step_index + 1);
+                    let val = unsafe { array.lazy_get_unchecked(index)? };
+                    return self.query_internal(val, step_index + 1);
                 }
             }
             _ => {
                 if index == 0 {
-                    return self.query(value, step_index + 1);
+                    return self.query_internal(value, step_index + 1);
                 }
             }
         }
@@ -122,39 +153,47 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    fn array_last_match(&mut self, value: Value<'a>, step_index: usize, minus: usize) -> YasonResult<bool> {
-        match value {
-            Value::Array(array) => {
+    fn array_last_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+        minus: usize,
+    ) -> YasonResult<bool> {
+        match value.data_type() {
+            DataType::Array => {
+                let array = unsafe { value.array()? };
                 let len = array.len()?;
                 if len - 1 > minus {
-                    let val = unsafe { array.get_unchecked(len - 1 - minus)? };
-                    return self.query(val, step_index + 1);
+                    let val = unsafe { array.lazy_get_unchecked(len - 1 - minus)? };
+                    return self.query_internal(val, step_index + 1);
                 }
             }
             _ => {
                 if minus == 0 {
-                    return self.query(value, step_index + 1);
+                    return self.query_internal(value, step_index + 1);
                 }
             }
         }
+
         Ok(false)
     }
 
     #[inline]
-    fn array_range_match(
+    fn array_range_match<const IN_ARRAY: bool>(
         &mut self,
-        value: Value<'a>,
+        value: LazyValue<'a, IN_ARRAY>,
         step_index: usize,
         begin: &'b SingleIndex,
         end: &'b SingleIndex,
     ) -> YasonResult<bool> {
-        match value {
-            Value::Array(array) => {
+        match value.data_type() {
+            DataType::Array => {
+                let array = unsafe { value.array()? };
                 let len = array.len()?;
                 if let Some((b, e)) = find_range(begin, end, len) {
                     for i in b..e + 1 {
-                        let val = unsafe { array.get_unchecked(i)? };
-                        let found = self.query(val, step_index + 1)?;
+                        let val = unsafe { array.lazy_get_unchecked(i)? };
+                        let found = self.query_internal(val, step_index + 1)?;
                         if self.for_exists && found {
                             return Ok(true);
                         }
@@ -163,7 +202,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {
                 if find_range(begin, end, 1).is_some() {
-                    return self.query(value, step_index + 1);
+                    return self.query_internal(value, step_index + 1);
                 }
             }
         }
@@ -171,14 +210,15 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    fn array_multi_steps_match(
+    fn array_multi_steps_match<const IN_ARRAY: bool>(
         &mut self,
-        value: Value<'a>,
+        value: LazyValue<'a, IN_ARRAY>,
         step_index: usize,
         arr_steps: &'b [SingleStep],
     ) -> YasonResult<bool> {
-        match value {
-            Value::Array(array) => {
+        match value.data_type() {
+            DataType::Array => {
+                let array = unsafe { value.array()? };
                 let mut arr_steps_index = 0;
                 while arr_steps_index < arr_steps.len() {
                     let cur_step = &arr_steps[arr_steps_index];
@@ -188,8 +228,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                         SingleStep::Single(single_index) => match single_index {
                             SingleIndex::Index(index) => {
                                 if *index < len {
-                                    let val = unsafe { array.get_unchecked(*index)? };
-                                    let found = self.query(val, step_index + 1)?;
+                                    let val = unsafe { array.lazy_get_unchecked(*index)? };
+                                    let found = self.query_internal(val, step_index + 1)?;
                                     if self.for_exists && found {
                                         return Ok(true);
                                     }
@@ -197,8 +237,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                             }
                             SingleIndex::Last(minus) => {
                                 if len - 1 > *minus {
-                                    let val = unsafe { array.get_unchecked(len - 1 - minus)? };
-                                    let found = self.query(val, step_index + 1)?;
+                                    let val = unsafe { array.lazy_get_unchecked(len - 1 - minus)? };
+                                    let found = self.query_internal(val, step_index + 1)?;
                                     if self.for_exists && found {
                                         return Ok(true);
                                     }
@@ -208,8 +248,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                         SingleStep::Range(begin, end) => {
                             if let Some((b, e)) = find_range(begin, end, len) {
                                 for i in b..e + 1 {
-                                    let val = unsafe { array.get_unchecked(i)? };
-                                    let found = self.query(val, step_index + 1)?;
+                                    let val = unsafe { array.lazy_get_unchecked(i)? };
+                                    let found = self.query_internal(val, step_index + 1)?;
                                     if self.for_exists && found {
                                         return Ok(true);
                                     }
@@ -222,7 +262,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {
                 if non_array_relaxed_match(arr_steps) {
-                    return self.query(value, step_index + 1);
+                    return self.query_internal(value, step_index + 1);
                 }
             }
         }
@@ -230,42 +270,55 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    fn array_wildcard_match(&mut self, value: Value<'a>, step_index: usize) -> YasonResult<bool> {
-        match value {
-            Value::Array(array) => {
-                for val in array.iter()? {
-                    let found = self.query(val?, step_index + 1)?;
+    fn array_wildcard_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+    ) -> YasonResult<bool> {
+        match value.data_type() {
+            DataType::Array => {
+                let array = unsafe { value.array()? };
+                for val in array.lazy_iter()? {
+                    let found = self.query_internal(val?, step_index + 1)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
                 }
             }
-            _ => return self.query(value, step_index + 1),
-        };
+            _ => return self.query_internal(value, step_index + 1),
+        }
+
         Ok(false)
     }
 
     #[inline]
-    fn descendent_step_match(&mut self, value: Value<'a>, step_index: usize, key: &'b str) -> YasonResult<bool> {
-        match value {
-            Value::Object(ref object) => {
-                if let Some(val) = object.get(key)? {
-                    let found = self.query(val, step_index + 1)?;
+    fn descendent_step_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+        key: &'b str,
+    ) -> YasonResult<bool> {
+        match value.data_type() {
+            DataType::Object => {
+                let object = unsafe { value.object()? };
+                if let Some(val) = object.lazy_get(key)? {
+                    let found = self.query_internal(val, step_index + 1)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
                 }
 
-                for val in object.value_iter()? {
-                    let found = self.query(val?, step_index)?;
+                for val in object.lazy_value_iter()? {
+                    let found = self.query_internal(val?, step_index)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
                 }
             }
-            Value::Array(ref array) => {
-                for val in array.iter()? {
-                    let found = self.query(val?, step_index)?;
+            DataType::Array => {
+                let array = unsafe { value.array()? };
+                for val in array.lazy_iter()? {
+                    let found = self.query_internal(val?, step_index)?;
                     if self.for_exists && found {
                         return Ok(true);
                     }
@@ -278,23 +331,34 @@ impl<'a, 'b> Selector<'a, 'b> {
     }
 
     #[inline]
-    fn func_step_match(&mut self, value: Value<'a>, step_index: usize, func: &'b FuncStep) -> YasonResult<bool> {
-        match func {
-            FuncStep::Count => self.query(value, step_index + 1),
+    fn func_step_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+        func: &'b FuncStep,
+    ) -> YasonResult<bool> {
+        debug_assert!(step_index + 1 == self.steps.len());
+        debug_assert!(self.with_wrapper);
+        let val = match func {
+            FuncStep::Count => Value::Null,
             FuncStep::Size => {
-                let size = match value {
-                    Value::Array(array) => array.len()?,
+                let size = match value.data_type() {
+                    DataType::Array => {
+                        let array = unsafe { value.array()? };
+                        array.len()?
+                    }
                     _ => 1,
                 };
-                let val = Value::Number(Number::from(size));
-                self.query(val, step_index + 1)
+
+                Value::Number(Number::from(size))
             }
             FuncStep::Type => {
                 let data_type = value.data_type() as u8;
-                let val = Value::Number(Number::from(data_type));
-                self.query(val, step_index + 1)
+                Value::Number(Number::from(data_type))
             }
-        }
+        };
+        push_value(self.query_buf, val)?;
+        Ok(false)
     }
 }
 

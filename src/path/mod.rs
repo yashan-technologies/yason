@@ -113,7 +113,7 @@ impl PathExpression {
         };
 
         let mut selector = Selector::new(self.steps(), with_wrapper, query_buf.as_mut(), false);
-        selector.query(Value::try_from(yason)?, 1)?;
+        selector.query(yason, 1)?;
 
         if !with_wrapper {
             debug_assert!(query_buf.as_ref().len() <= 1);
@@ -152,7 +152,7 @@ impl PathExpression {
 
         let mut query_buf = Vec::new();
         let mut selector = Selector::new(self.steps(), true, &mut query_buf, true);
-        selector.query(Value::try_from(yason)?, 1)
+        selector.query(yason, 1)
     }
 }
 
