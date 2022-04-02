@@ -13,7 +13,7 @@ struct PrettyOptions<'a> {
 
 impl<'a> PrettyOptions<'a> {
     #[inline]
-    fn new(indent: usize, newline_in_empty: bool, newline_in_nested: bool, kv_delimiter: &'a [u8]) -> Self {
+    const fn new(indent: usize, newline_in_empty: bool, newline_in_nested: bool, kv_delimiter: &'a [u8]) -> Self {
         Self {
             indent,
             newline_in_empty,
@@ -31,7 +31,7 @@ pub struct PrettyFormatter<'a> {
 
 impl<'a> PrettyFormatter<'a> {
     #[inline]
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             options: PrettyOptions::new(2, true, true, b" : "),
             cur_indent_level: 0,

@@ -64,6 +64,17 @@ impl<'a> Array<'a> {
         Ok(LazyValue::new(self.0, data_type, value_entry_pos))
     }
 
+    /// Gets the element at the given index.
+    ///
+    /// # Safety
+    ///
+    /// Callers should guarantee the index is not out of bounds.
+    #[inline]
+    pub unsafe fn get_unchecked(&self, index: usize) -> YasonResult<Value<'a>> {
+        debug_assert!(index < self.len()?);
+        self.read_value(index)
+    }
+
     /// Gets the element's type at the given index.
     #[inline]
     pub fn type_of(&self, index: usize) -> YasonResult<DataType> {

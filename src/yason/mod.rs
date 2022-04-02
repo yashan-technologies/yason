@@ -7,7 +7,7 @@ pub use crate::yason::array::{Array, ArrayIter};
 pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 
 use crate::binary::{DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE};
-use crate::format::LazyFormat;
+use crate::format::{CompactFormatter, FormatResult, Formatter, LazyFormat, PrettyFormatter};
 use crate::util::decode_varint;
 use crate::{BuildError, DataType, Number, Scalar};
 use std::borrow::Borrow;
@@ -65,6 +65,7 @@ pub type YasonResult<T> = std::result::Result<T, YasonError>;
 
 /// An owned `Yason` value, backed by a buffer of bytes in yason binary format.
 /// This can be created from a Vec<u8>.
+#[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct YasonBuf {
     bytes: Vec<u8>,
@@ -81,10 +82,17 @@ impl YasonBuf {
         debug_assert!(!bytes.is_empty());
         YasonBuf { bytes }
     }
+
+    #[inline]
+    pub fn clone_from_yason(&mut self, yason: &Yason) {
+        self.bytes.clear();
+        self.bytes.extend_from_slice(yason.as_bytes())
+    }
 }
 
 /// A slice of `Yason` value. This can be created from a [`YasonBuf`] or any type the contains
 /// valid bytes in yason binary format.
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Yason {
     bytes: [u8],
@@ -113,6 +121,13 @@ impl ToOwned for Yason {
     fn to_owned(&self) -> YasonBuf {
         self.to_yason_buf()
             .expect("an out-of-memory error occurred when converting a yason")
+    }
+}
+
+impl AsRef<Yason> for Yason {
+    #[inline]
+    fn as_ref(&self) -> &Yason {
+        self
     }
 }
 
@@ -215,6 +230,18 @@ impl Yason {
     #[inline]
     pub fn format(&self, pretty: bool) -> impl Display + '_ {
         LazyFormat::new(self, pretty)
+    }
+
+    /// Formats the yason as a compact or pretty string to a provided buffer.
+    #[inline]
+    pub fn format_to<W: fmt::Write>(&self, pretty: bool, buf: &mut W) -> FormatResult<()> {
+        if pretty {
+            let mut fmt = PrettyFormatter::new();
+            fmt.format(self, buf)
+        } else {
+            let mut fmt = CompactFormatter::new();
+            fmt.format(self, buf)
+        }
     }
 
     #[inline]
