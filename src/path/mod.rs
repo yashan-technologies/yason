@@ -1,11 +1,13 @@
 //! Path Expression.
 
 use crate::path::parse::{FuncStep, PathParser, Step};
+use std::fmt;
 use std::str::FromStr;
 
 use crate::yason::YasonResult;
 use crate::{ArrayRefBuilder, DataType, Number, Value, Yason, YasonError};
 
+use crate::format::{CompactFormatter, FormatResult, Formatter, PrettyFormatter};
 use crate::path::query::Selector;
 pub use parse::PathParseError;
 
@@ -28,6 +30,20 @@ pub enum QueriedValue<'a, 'b> {
 
     /// Result returned when the user provides a result buffer, whether or not WITH WRAPPER is specified and the query buffer is provided.  
     Yason(&'b Yason),
+}
+
+impl<'a, 'b> QueriedValue<'a, 'b> {
+    /// Formats the value as a compact or pretty string.
+    #[inline]
+    pub fn format_to<W: fmt::Write>(&self, pretty: bool, writer: &mut W) -> FormatResult<()> {
+        match self {
+            QueriedValue::None => Ok(()),
+            QueriedValue::Value(value) => value.format_to(pretty, writer),
+            QueriedValue::Values(values) => values_format_to(values, pretty, writer),
+            QueriedValue::ValuesRef(values) => values_format_to(values, pretty, writer),
+            QueriedValue::Yason(yason) => yason.format_to(pretty, writer),
+        }
+    }
 }
 
 enum QueryBuf<'a, 'b> {
@@ -130,6 +146,10 @@ impl PathExpression {
             push_value(query_buf.as_mut(), val)?;
         }
 
+        if query_buf.as_ref().is_empty() {
+            return Ok(QueriedValue::None);
+        }
+
         match result_buf {
             None => match query_buf {
                 QueryBuf::Owned(buf) => Ok(QueriedValue::Values(buf)),
@@ -189,4 +209,19 @@ fn values_to_yason<'a>(values: &[Value], bytes: &'a mut Vec<u8>) -> YasonResult<
     }
 
     Ok(builder.finish()?)
+}
+
+#[inline]
+fn values_format_to<W: fmt::Write>(values: &[Value], pretty: bool, writer: &mut W) -> FormatResult<()> {
+    if values.is_empty() {
+        return Ok(());
+    }
+
+    if pretty {
+        let mut fmt = PrettyFormatter::new();
+        unsafe { fmt.write_values(values, writer) }
+    } else {
+        let mut fmt = CompactFormatter::new();
+        unsafe { fmt.write_values(values, writer) }
+    }
 }

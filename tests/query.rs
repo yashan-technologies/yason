@@ -80,17 +80,9 @@ fn assert_inner(input: &str, path: &str, expected: Option<&str>, with_wrapper: b
                     _ => unreachable!(),
                 }
             }
-        } else if to_yason {
-            match res {
-                QueriedValue::Yason(yason) => assert_eq!(yason.array().unwrap().len().unwrap(), 0),
-                _ => unreachable!(),
-            }
         } else {
-            match res {
-                QueriedValue::Values(values) => assert!(values.is_empty()),
-                _ => unreachable!(),
-            }
-        };
+            assert!(matches!(res, QueriedValue::None));
+        }
     } else if error {
         assert!(res.is_err());
         assert!(matches!(res.err().unwrap(), YasonError::MultiValuesWithoutWrapper));
@@ -457,4 +449,177 @@ fn test_exists() {
     let input = r#"[{"key": [{"key": [{"key": [{"key": 123}]}]}]}]"#;
     let path = r#"$.key.key.key.key"#;
     assert(input, path, true);
+}
+
+mod test_queried_value_format_to {
+    use std::str::FromStr;
+    use yason::{PathExpression, Value, Yason, YasonBuf};
+
+    fn format<'a, 'b>(
+        yason: &'a Yason,
+        path: &PathExpression,
+        compact: &str,
+        pretty: &str,
+        with_wrapper: bool,
+        query_buf: Option<&'b mut Vec<Value<'a>>>,
+        result_buf: Option<&'b mut Vec<u8>>,
+    ) {
+        let value = path.query(yason, with_wrapper, query_buf, result_buf).unwrap();
+
+        let mut res = String::new();
+        value.format_to(false, &mut res).unwrap();
+        assert_eq!(res.as_str(), compact);
+
+        res.clear();
+        value.format_to(true, &mut res).unwrap();
+        assert_eq!(res.as_str(), pretty);
+    }
+
+    fn assert_queried_none(input: &str, path: &str) {
+        let yason_buf = YasonBuf::parse(input).unwrap();
+        let path = PathExpression::from_str(path).unwrap();
+
+        format(yason_buf.as_ref(), &path, "", "", false, None, None);
+    }
+
+    fn assert_queried_value(input: &str, path: &str, compact: &str, pretty: &str) {
+        let yason_buf = YasonBuf::parse(input).unwrap();
+        let path = PathExpression::from_str(path).unwrap();
+
+        format(yason_buf.as_ref(), &path, compact, pretty, false, None, None);
+    }
+
+    fn assert_queried_values(input: &str, path: &str, compact: &str, pretty: &str) {
+        let yason_buf = YasonBuf::parse(input).unwrap();
+        let path = PathExpression::from_str(path).unwrap();
+
+        format(yason_buf.as_ref(), &path, compact, pretty, true, None, None);
+    }
+
+    fn assert_queried_values_ref(input: &str, path: &str, compact: &str, pretty: &str) {
+        let yason_buf = YasonBuf::parse(input).unwrap();
+        let path = PathExpression::from_str(path).unwrap();
+
+        let mut query_buf = Vec::new();
+        format(
+            yason_buf.as_ref(),
+            &path,
+            compact,
+            pretty,
+            true,
+            Some(&mut query_buf),
+            None,
+        );
+    }
+
+    fn assert_queried_yason(input: &str, path: &str, compact: &str, pretty: &str) {
+        let yason_buf = YasonBuf::parse(input).unwrap();
+        let path = PathExpression::from_str(path).unwrap();
+
+        let mut query_buf = Vec::new();
+        let mut result_buf = Vec::new();
+        format(
+            yason_buf.as_ref(),
+            &path,
+            compact,
+            pretty,
+            true,
+            Some(&mut query_buf),
+            Some(&mut result_buf),
+        );
+    }
+
+    #[test]
+    fn test_queried_none() {
+        let input = r#"{"key1": 123, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789}, [10, false, null]], "key5": {"key1": true, "key2": 789, "key3": null}}"#;
+
+        let path = r#"$.key4[10]"#;
+        assert_queried_none(input, path);
+
+        let path = r#"$.key10"#;
+        assert_queried_none(input, path);
+    }
+
+    #[test]
+    fn test_queried_value() {
+        let input = r#"{"key1": 123, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789}, [10, false, null]], "key5": {"key1": true, "key2": 789, "key3": null}}"#;
+
+        let path = r#"$.key1"#;
+        assert_queried_value(input, path, r#"123"#, r#"123"#);
+
+        let path = r#"$.key2"#;
+        assert_queried_value(input, path, r#"true"#, r#"true"#);
+
+        let path = r#"$.key3"#;
+        assert_queried_value(input, path, r#"null"#, r#"null"#);
+
+        let path = r#"$.key4"#;
+        let compact = r#"[456,false,null,{"key1":true,"key2":789},[10,false,null]]"#;
+        let pretty = "[\n  456,\n  false,\n  null,\n  {\n    \"key1\" : true,\n    \"key2\" : 789\n  },\n  [\n    10,\n    false,\n    null\n  ]\n]";
+        assert_queried_value(input, path, compact, pretty);
+
+        let path = r#"$.key5"#;
+        let compact = r#"{"key1":true,"key2":789,"key3":null}"#;
+        let pretty = "{\n  \"key1\" : true,\n  \"key2\" : 789,\n  \"key3\" : null\n}";
+        assert_queried_value(input, path, compact, pretty);
+    }
+
+    #[test]
+    fn test_queried_values_and_ref_and_yason() {
+        let input = r#"{"key1": 123, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789}, [10, false, null]], "key5": {"key1": true, "key2": 789, "key3": null}}"#;
+
+        let path = r#"$.key10"#;
+        assert_queried_values(input, path, "", "");
+        assert_queried_values_ref(input, path, "", "");
+        assert_queried_yason(input, path, "", "");
+
+        let path = r#"$.key1"#;
+        let compact = "[123]";
+        let pretty = "[\n  123\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+
+        let path = r#"$.key2"#;
+        let compact = "[true]";
+        let pretty = "[\n  true\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+
+        let path = r#"$.key3"#;
+        let compact = "[null]";
+        let pretty = "[\n  null\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+
+        let path = r#"$.key4"#;
+        let compact = r#"[[456,false,null,{"key1":true,"key2":789},[10,false,null]]]"#;
+        let pretty = "[\n  [\n    456,\n    false,\n    null,\n    {\n      \"key1\" : true,\n      \"key2\" : 789\n    },\n    [\n      10,\n      false,\n      null\n    ]\n  ]\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+
+        let path = r#"$.key5"#;
+        let compact = r#"[{"key1":true,"key2":789,"key3":null}]"#;
+        let pretty = "[\n  {\n    \"key1\" : true,\n    \"key2\" : 789,\n    \"key3\" : null\n  }\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+
+        let path = r#"$.key5.*"#;
+        let compact = "[true,789,null]";
+        let pretty = "[\n  true,\n  789,\n  null\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+
+        let path = r#"$..key3"#;
+        let compact = "[null,null]";
+        let pretty = "[\n  null,\n  null\n]";
+        assert_queried_values(input, path, compact, pretty);
+        assert_queried_values_ref(input, path, compact, pretty);
+        assert_queried_yason(input, path, compact, pretty);
+    }
 }

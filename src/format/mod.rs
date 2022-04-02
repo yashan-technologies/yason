@@ -160,6 +160,20 @@ pub trait Formatter {
     }
 
     #[inline]
+    unsafe fn write_values<W: fmt::Write>(&mut self, values: &[Value], writer: &mut W) -> FormatResult<()> {
+        debug_assert!(!values.is_empty());
+        self.begin_array(writer)?;
+
+        self.write_array_value(&values[0], true, writer)?;
+
+        for val in values.iter().skip(1) {
+            self.write_array_value(val, false, writer)?;
+        }
+
+        self.end_array(writer)
+    }
+
+    #[inline]
     fn write_array_value<W: fmt::Write>(&mut self, value: &Value, first: bool, writer: &mut W) -> FormatResult<()> {
         self.begin_array_value(first, writer)?;
         self.write_value(value, writer)?;

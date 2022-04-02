@@ -383,6 +383,30 @@ impl<'a> Value<'a> {
             Value::Null => Ok(Scalar::null_with_vec(buf)?),
         }
     }
+
+    #[inline]
+    pub(crate) fn format_to<W: fmt::Write>(&self, pretty: bool, writer: &mut W) -> FormatResult<()> {
+        match self {
+            Value::Object(object) => object.yason().format_to(pretty, writer),
+            Value::Array(array) => array.yason().format_to(pretty, writer),
+            Value::String(str) => {
+                let mut fmt = CompactFormatter::new();
+                fmt.write_string(str, writer)
+            }
+            Value::Number(number) => {
+                let mut fmt = CompactFormatter::new();
+                fmt.write_number(number, writer)
+            }
+            Value::Bool(bool) => {
+                let mut fmt = CompactFormatter::new();
+                fmt.write_bool(*bool, writer)
+            }
+            Value::Null => {
+                let mut fmt = CompactFormatter::new();
+                fmt.write_null(writer)
+            }
+        }
+    }
 }
 
 impl<'a> TryFrom<&'a Yason> for Value<'a> {
