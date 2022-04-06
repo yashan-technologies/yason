@@ -1,5 +1,6 @@
 //! Formatter.
 
+use crate::yason::LazyValue;
 use crate::{Array, DataType, Number, Object, Value, Yason, YasonError};
 use decimal_rs::DecimalFormatError;
 pub use pretty::PrettyFormatter;
@@ -49,40 +50,38 @@ impl From<YasonError> for FormatError {
 pub trait Formatter {
     #[inline]
     fn format<W: fmt::Write>(&mut self, yason: &Yason, writer: &mut W) -> FormatResult<()> {
-        match yason.data_type()? {
-            DataType::Object => {
-                let object = unsafe { Object::new_unchecked(yason) };
-                self.write_object(&object, writer)
-            }
-            DataType::Array => {
-                let array = unsafe { Array::new_unchecked(yason) };
-                self.write_array(&array, writer)
-            }
-            DataType::String => {
-                let str = unsafe { yason.string_unchecked()? };
-                self.write_string(str, writer)
-            }
-            DataType::Number => {
-                let num = unsafe { yason.number_unchecked()? };
-                self.write_number(&num, writer)
-            }
-            DataType::Bool => {
-                let bool = unsafe { yason.bool_unchecked()? };
-                self.write_bool(bool, writer)
-            }
-            DataType::Null => self.write_null(writer),
-        }
+        let lazy_value = LazyValue::try_from(yason)?;
+        self.write_lazy_value(&lazy_value, writer)
     }
 
     #[inline]
-    fn write_value<W: fmt::Write>(&mut self, value: &Value, writer: &mut W) -> FormatResult<()> {
-        match value {
-            Value::Object(val) => self.write_object(val, writer),
-            Value::Array(val) => self.write_array(val, writer),
-            Value::String(val) => self.write_string(val, writer),
-            Value::Number(val) => self.write_number(val, writer),
-            Value::Bool(val) => self.write_bool(*val, writer),
-            Value::Null => self.write_null(writer),
+    fn write_lazy_value<W: fmt::Write, const IN_ARRAY: bool>(
+        &mut self,
+        value: &LazyValue<IN_ARRAY>,
+        writer: &mut W,
+    ) -> FormatResult<()> {
+        match value.data_type() {
+            DataType::Object => {
+                let object = unsafe { value.object()? };
+                self.write_object(&object, writer)
+            }
+            DataType::Array => {
+                let array = unsafe { value.array()? };
+                self.write_array(&array, writer)
+            }
+            DataType::String => {
+                let string = unsafe { value.string()? };
+                self.write_string(string, writer)
+            }
+            DataType::Number => {
+                let number = unsafe { value.number()? };
+                self.write_number(&number, writer)
+            }
+            DataType::Bool => {
+                let bool = unsafe { value.bool()? };
+                self.write_bool(bool, writer)
+            }
+            DataType::Null => self.write_null(writer),
         }
     }
 
@@ -115,7 +114,7 @@ pub trait Formatter {
     fn write_object<W: fmt::Write>(&mut self, value: &Object, writer: &mut W) -> FormatResult<()> {
         self.begin_object(writer)?;
 
-        let mut iter = value.iter()?;
+        let mut iter = value.lazy_iter()?;
         if let Some(entry) = iter.next() {
             let (key, value) = entry?;
             self.write_object_value(key, &value, true, writer)?;
@@ -129,10 +128,10 @@ pub trait Formatter {
     }
 
     #[inline]
-    fn write_object_value<W: fmt::Write>(
+    fn write_object_value<W: fmt::Write, const IN_ARRAY: bool>(
         &mut self,
         key: &str,
-        value: &Value,
+        value: &LazyValue<IN_ARRAY>,
         first: bool,
         writer: &mut W,
     ) -> FormatResult<()> {
@@ -140,7 +139,7 @@ pub trait Formatter {
         self.write_string(key, writer)?;
         self.end_object_key(writer)?;
         self.begin_object_value(writer)?;
-        self.write_value(value, writer)?;
+        self.write_lazy_value(value, writer)?;
         self.end_object_value(writer)
     }
 
@@ -148,7 +147,7 @@ pub trait Formatter {
     fn write_array<W: fmt::Write>(&mut self, value: &Array, writer: &mut W) -> FormatResult<()> {
         self.begin_array(writer)?;
 
-        let mut iter = value.iter()?;
+        let mut iter = value.lazy_iter()?;
         if let Some(val) = iter.next() {
             self.write_array_value(&val?, true, writer)?;
         }
@@ -160,23 +159,14 @@ pub trait Formatter {
     }
 
     #[inline]
-    unsafe fn write_values<W: fmt::Write>(&mut self, values: &[Value], writer: &mut W) -> FormatResult<()> {
-        debug_assert!(!values.is_empty());
-        self.begin_array(writer)?;
-
-        self.write_array_value(&values[0], true, writer)?;
-
-        for val in values.iter().skip(1) {
-            self.write_array_value(val, false, writer)?;
-        }
-
-        self.end_array(writer)
-    }
-
-    #[inline]
-    fn write_array_value<W: fmt::Write>(&mut self, value: &Value, first: bool, writer: &mut W) -> FormatResult<()> {
+    fn write_array_value<W: fmt::Write, const IN_ARRAY: bool>(
+        &mut self,
+        value: &LazyValue<IN_ARRAY>,
+        first: bool,
+        writer: &mut W,
+    ) -> FormatResult<()> {
         self.begin_array_value(first, writer)?;
-        self.write_value(value, writer)?;
+        self.write_lazy_value(value, writer)?;
         self.end_array_value(writer)
     }
 
@@ -251,6 +241,42 @@ pub trait Formatter {
     #[inline]
     fn end_object_value<W: fmt::Write>(&mut self, _writer: &mut W) -> FormatResult<()> {
         Ok(())
+    }
+
+    #[inline]
+    unsafe fn write_values<W: fmt::Write>(&mut self, values: &[Value], writer: &mut W) -> FormatResult<()> {
+        debug_assert!(!values.is_empty());
+        self.begin_array(writer)?;
+
+        self.write_value(&values[0], true, writer)?;
+
+        for val in values.iter().skip(1) {
+            self.write_value(val, false, writer)?;
+        }
+
+        self.end_array(writer)
+    }
+
+    #[inline]
+    fn write_value<W: fmt::Write>(&mut self, value: &Value, first: bool, writer: &mut W) -> FormatResult<()> {
+        self.begin_array_value(first, writer)?;
+
+        match value {
+            Value::Object(object) => {
+                let lazy_value = LazyValue::try_from(object.yason())?;
+                self.write_lazy_value(&lazy_value, writer)
+            }
+            Value::Array(array) => {
+                let lazy_value = LazyValue::try_from(array.yason())?;
+                self.write_lazy_value(&lazy_value, writer)
+            }
+            Value::String(string) => self.write_string(string, writer),
+            Value::Number(number) => self.write_number(number, writer),
+            Value::Bool(bool) => self.write_bool(*bool, writer),
+            Value::Null => self.write_null(writer),
+        }?;
+
+        self.end_array_value(writer)
     }
 }
 

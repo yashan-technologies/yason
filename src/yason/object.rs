@@ -17,6 +17,11 @@ impl<'a> Object<'a> {
         ObjectIter::try_new(self.0)
     }
 
+    #[inline]
+    pub(crate) fn lazy_iter(&self) -> YasonResult<LazyObjectIter<'a>> {
+        LazyObjectIter::try_new(self.0)
+    }
+
     /// Gets an iterator over the keys of the object.
     #[inline]
     pub fn key_iter(&self) -> YasonResult<KeyIter<'a>> {
@@ -361,6 +366,45 @@ impl<'a> Iterator for ObjectIter<'a> {
             let entry = self.next_entry();
             self.index += 1;
             Some(entry)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct LazyObjectIter<'a> {
+    object: Object<'a>,
+    len: usize,
+    index: usize,
+}
+
+impl<'a> LazyObjectIter<'a> {
+    #[inline]
+    fn try_new(yason: &'a Yason) -> YasonResult<Self> {
+        let object = Object(yason);
+        Ok(Self {
+            len: object.len()?,
+            object,
+            index: 0,
+        })
+    }
+
+    #[inline]
+    fn next(&mut self) -> YasonResult<(&'a str, LazyValue<'a, false>)> {
+        let (key, value_pos) = unsafe { self.object.read_nth_key_and_value_pos(self.index)? };
+        let data_type = self.object.0.read_type(value_pos)?;
+        self.index += 1;
+        Ok((key, LazyValue::new(self.object.0, data_type, value_pos)))
+    }
+}
+
+impl<'a> Iterator for LazyObjectIter<'a> {
+    type Item = YasonResult<(&'a str, LazyValue<'a, false>)>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.len {
+            Some(self.next())
         } else {
             None
         }

@@ -1,7 +1,8 @@
 //! PrettyFormatter
 
 use crate::format::{FormatResult, Formatter, WriteExt};
-use crate::{DataType, Value};
+use crate::yason::LazyValue;
+use crate::DataType;
 use std::fmt;
 
 struct PrettyOptions<'a> {
@@ -42,10 +43,10 @@ impl<'a> PrettyFormatter<'a> {
 
 impl Formatter for PrettyFormatter<'_> {
     #[inline]
-    fn write_object_value<W: fmt::Write>(
+    fn write_object_value<W: fmt::Write, const IN_ARRAY: bool>(
         &mut self,
         key: &str,
-        value: &Value,
+        value: &LazyValue<IN_ARRAY>,
         first: bool,
         writer: &mut W,
     ) -> FormatResult<()> {
@@ -59,7 +60,7 @@ impl Formatter for PrettyFormatter<'_> {
             indent(self.cur_indent_level, self.options.indent, writer)?;
         }
 
-        self.write_value(value, writer)?;
+        self.write_lazy_value(value, writer)?;
         self.end_object_value(writer)
     }
 
