@@ -14,10 +14,16 @@ documentation = "https://docs.rs/yason/"
 [dependencies]
 decimal-rs = "0.1.34"
 serde_json = {version = "1.0.79", features = ["arbitrary_precision"]}
+serde = { version = "1.0.136", optional = true }
 
 [dev-dependencies]
 bencher = "0.1.5"
+bincode = "1.3.3"
 
 [[bench]]
 name = "benchmark"
 harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

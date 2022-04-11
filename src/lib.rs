@@ -1,5 +1,12 @@
 //! Encoding and decoding support for YASON in Rust.
 //!
+//! ## Optional features
+//!
+//! ### `serde`
+//!
+//! When this optional dependency is enabled, `YasonBuf` implements the `serde::Serialize` and
+//! `serde::Deserialize` traits.
+//!
 //! ## Yason binary format
 //!
 //! ```BNF
@@ -172,6 +179,8 @@
 //! ```
 //!
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod binary;
 mod builder;
 mod data_type;
@@ -181,6 +190,9 @@ mod path;
 mod util;
 mod vec;
 mod yason;
+
+#[cfg(feature = "serde")]
+mod serde;
 
 pub use self::{
     builder::{ArrayBuilder, ArrayRefBuilder, BuildError, NumberError, ObjectBuilder, ObjectRefBuilder, Scalar},
