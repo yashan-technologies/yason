@@ -353,8 +353,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                 Value::Number(Number::from(size))
             }
             FuncStep::Type => {
-                let data_type = value.data_type() as u8;
-                Value::Number(Number::from(data_type))
+                let data_type = value.data_type();
+                Value::String(data_type.name())
             }
         };
         push_value(self.query_buf, val)?;

@@ -310,7 +310,7 @@ fn test_query_with_wrapper() {
     assert_query_with_wrapper(input, path, Some(expected));
 
     let path = "$.key4[last - 20, last - 10, 2 to 4, 0].type()";
-    let expected = r#"[6, 1, 2, 4]"#;
+    let expected = r#"["null", "object", "array", "number"]"#;
     assert_query_with_wrapper(input, path, Some(expected));
 
     let input = r#"[{"key": [{"key": [{"key": [{"key": 123}]}]}]}]"#;
