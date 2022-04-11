@@ -248,6 +248,19 @@ impl Yason {
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
+
+    /// Returns whether two Yason are equal.
+    #[inline]
+    pub fn equals<T: AsRef<Yason>>(&self, other: T) -> YasonResult<bool> {
+        let other = other.as_ref();
+        if self.bytes.len() != other.bytes.len() || self.data_type()? != other.data_type()? {
+            return Ok(false);
+        }
+
+        let left = LazyValue::try_from(self)?;
+        let right = LazyValue::try_from(other)?;
+        left.equals(right)
+    }
 }
 
 impl Yason {
@@ -348,8 +361,24 @@ impl Yason {
     }
 }
 
+impl PartialEq for Yason {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other).expect("an error occurred when comparing yason")
+    }
+}
+
+impl PartialEq for YasonBuf {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref()
+            .equals(other)
+            .expect("an error occurred when comparing yason")
+    }
+}
+
 /// Possible yason value corresponding to the data type.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Value<'a> {
     Object(Object<'a>),
     Array(Array<'a>),
@@ -510,6 +539,22 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
             Array::new_unchecked(self.yason).read_bool(self.value_pos)
         } else {
             self.yason.read_bool(self.value_pos + DATA_TYPE_SIZE)
+        }
+    }
+
+    #[inline]
+    pub fn equals(&self, other: LazyValue<IN_ARRAY>) -> YasonResult<bool> {
+        if self.data_type() != other.data_type() || self.yason.bytes.len() != other.yason.bytes.len() {
+            return Ok(false);
+        }
+
+        match self.data_type() {
+            DataType::Object => unsafe { self.object()?.equals(other.object()?) },
+            DataType::Array => unsafe { self.array()?.equals(other.array()?) },
+            DataType::String => unsafe { Ok(self.string()?.eq(other.string()?)) },
+            DataType::Number => unsafe { Ok(self.number()?.eq(&other.number()?)) },
+            DataType::Bool => unsafe { Ok(self.bool()?.eq(&other.bool()?)) },
+            DataType::Null => Ok(true),
         }
     }
 }

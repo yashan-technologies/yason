@@ -6,7 +6,7 @@ use crate::yason::{LazyValue, Value, Yason, YasonError, YasonResult};
 use crate::{DataType, Number};
 
 /// An array in yason binary format.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct Array<'a>(&'a Yason);
 
@@ -140,6 +140,24 @@ impl<'a> Array<'a> {
         self.0.check_type(value_entry_pos, DataType::Bool)?;
         self.read_bool(value_entry_pos)
     }
+
+    #[inline]
+    pub(crate) fn equals<T: AsRef<Array<'a>>>(&self, other: T) -> YasonResult<bool> {
+        let other = other.as_ref();
+
+        if self.len()? != other.len()? {
+            return Ok(false);
+        }
+
+        for (l_value, r_value) in self.lazy_iter()?.zip(other.lazy_iter()?) {
+            let res = l_value?.equals(r_value?)?;
+            if !res {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
 }
 
 impl<'a> Array<'a> {
@@ -222,6 +240,13 @@ impl<'a> Array<'a> {
             DataType::Null => Value::Null,
         };
         Ok(value)
+    }
+}
+
+impl<'a> AsRef<Array<'a>> for Array<'a> {
+    #[inline]
+    fn as_ref(&self) -> &Array<'a> {
+        self
     }
 }
 

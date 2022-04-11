@@ -6,7 +6,7 @@ use crate::yason::{LazyValue, Value, Yason, YasonResult};
 use crate::{DataType, Number};
 
 /// An object in yason binary format.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct Object<'a>(&'a Yason);
 
@@ -183,6 +183,29 @@ impl<'a> Object<'a> {
         }
         Ok(None)
     }
+
+    #[inline]
+    pub(crate) fn equals<T: AsRef<Object<'a>>>(&self, other: T) -> YasonResult<bool> {
+        let other = other.as_ref();
+        if self.len()? != other.len()? {
+            return Ok(false);
+        }
+
+        for (l_entry, r_entry) in self.lazy_iter()?.zip(other.lazy_iter()?) {
+            let (l_key, l_value) = l_entry?;
+            let (r_key, r_value) = r_entry?;
+
+            if l_key != r_key {
+                return Ok(false);
+            }
+            let res = l_value.equals(r_value)?;
+            if !res {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
 }
 
 impl<'a> Object<'a> {
@@ -316,6 +339,13 @@ impl<'a> Object<'a> {
         let value_pos = self.read_nth_value_pos(index)?;
         let data_type = self.0.read_type(value_pos)?;
         Ok((data_type, value_pos))
+    }
+}
+
+impl<'a> AsRef<Object<'a>> for Object<'a> {
+    #[inline]
+    fn as_ref(&self) -> &Object<'a> {
+        self
     }
 }
 
