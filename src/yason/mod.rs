@@ -119,8 +119,7 @@ impl ToOwned for Yason {
 
     #[inline]
     fn to_owned(&self) -> YasonBuf {
-        self.to_yason_buf()
-            .expect("an out-of-memory error occurred when converting a yason")
+        unsafe { YasonBuf::new_unchecked(self.bytes.to_vec()) }
     }
 }
 
