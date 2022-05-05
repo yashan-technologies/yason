@@ -42,7 +42,46 @@ fn test_scalar_fmt() {
         assert_scalar_fmt(r#""ab\tc""#, r#""ab\tc""#);
         assert_scalar_fmt(r#""ab\"c""#, r#""ab\"c""#);
         assert_scalar_fmt(r#""ab\\c""#, r#""ab\\c""#);
-        assert_scalar_fmt(r#""ab\/tc""#, r#""ab\/tc""#);
+        assert_scalar_fmt(r#""ab\/tc""#, r#""ab/tc""#);
+
+        assert_scalar_fmt(r#""\u0000""#, r#""\u0000""#);
+        assert_scalar_fmt(r#""\u0001""#, r#""\u0001""#);
+        assert_scalar_fmt(r#""\u0002""#, r#""\u0002""#);
+        assert_scalar_fmt(r#""\u0003""#, r#""\u0003""#);
+        assert_scalar_fmt(r#""\u0004""#, r#""\u0004""#);
+        assert_scalar_fmt(r#""\u0005""#, r#""\u0005""#);
+        assert_scalar_fmt(r#""\u0006""#, r#""\u0006""#);
+        assert_scalar_fmt(r#""\u0007""#, r#""\u0007""#);
+        assert_scalar_fmt(r#""\u0008""#, r#""\b""#);
+        assert_scalar_fmt(r#""\u0009""#, r#""\t""#);
+        assert_scalar_fmt(r#""\u000A""#, r#""\n""#);
+        assert_scalar_fmt(r#""\u000B""#, r#""\u000B""#);
+        assert_scalar_fmt(r#""\u000C""#, r#""\f""#);
+        assert_scalar_fmt(r#""\u000D""#, r#""\r""#);
+        assert_scalar_fmt(r#""\u000E""#, r#""\u000E""#);
+        assert_scalar_fmt(r#""\u000F""#, r#""\u000F""#);
+        assert_scalar_fmt(r#""\u0010""#, r#""\u0010""#);
+        assert_scalar_fmt(r#""\u0011""#, r#""\u0011""#);
+        assert_scalar_fmt(r#""\u0012""#, r#""\u0012""#);
+        assert_scalar_fmt(r#""\u0013""#, r#""\u0013""#);
+        assert_scalar_fmt(r#""\u0014""#, r#""\u0014""#);
+        assert_scalar_fmt(r#""\u0015""#, r#""\u0015""#);
+        assert_scalar_fmt(r#""\u0016""#, r#""\u0016""#);
+        assert_scalar_fmt(r#""\u0017""#, r#""\u0017""#);
+        assert_scalar_fmt(r#""\u0018""#, r#""\u0018""#);
+        assert_scalar_fmt(r#""\u0019""#, r#""\u0019""#);
+        assert_scalar_fmt(r#""\u001A""#, r#""\u001A""#);
+        assert_scalar_fmt(r#""\u001B""#, r#""\u001B""#);
+        assert_scalar_fmt(r#""\u001C""#, r#""\u001C""#);
+        assert_scalar_fmt(r#""\u001D""#, r#""\u001D""#);
+        assert_scalar_fmt(r#""\u001E""#, r#""\u001E""#);
+        assert_scalar_fmt(r#""\u001F""#, r#""\u001F""#);
+
+        assert_scalar_fmt(r#""\u0022""#, r#""\"""#);
+        assert_scalar_fmt(r#""\u002F""#, r#""/""#);
+        assert_scalar_fmt(r#""\u005c""#, r#""\\""#);
+        assert_scalar_fmt(r#""\u007F""#, r#""\u007F""#);
+        assert_scalar_fmt(r#""\u007f""#, r#""\u007F""#);
     }
 
     // number
