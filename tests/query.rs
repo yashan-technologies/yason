@@ -212,6 +212,18 @@ fn test_query_with_wrapper() {
     let expected = r#"[123]"#;
     assert_query_with_wrapper(input, path, Some(expected));
 
+    let path = r#"$.  key1"#;
+    let expected = r#"[123]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
+    let path = r#"$.key1  "#;
+    let expected = r#"[123]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
+    let path = r#"$.  key1  "#;
+    let expected = r#"[123]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
     let path = r#"$.key4[0]"#;
     let expected = r#"[456]"#;
     assert_query_with_wrapper(input, path, Some(expected));
@@ -360,6 +372,15 @@ fn test_exists() {
     assert(input, path, true);
 
     let path = r#"$.key1"#;
+    assert(input, path, true);
+
+    let path = r#"$.  key1"#;
+    assert(input, path, true);
+
+    let path = r#"$.key1  "#;
+    assert(input, path, true);
+
+    let path = r#"$.  key1  "#;
     assert(input, path, true);
 
     let path = r#"$.key4[*]"#;

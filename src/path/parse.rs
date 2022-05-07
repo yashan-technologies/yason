@@ -393,19 +393,20 @@ impl<'a> PathParser<'a> {
             Some(char) if char.is_ascii_alphabetic() => {
                 let begin = self.pos;
                 self.skip(|i| i.is_ascii_alphabetic() || i.is_ascii_digit());
+                let end = self.pos;
 
                 if DESCENDENT {
-                    let key = self.create_key::<false>(begin, self.pos)?;
+                    let key = self.create_key::<false>(begin, end)?;
                     self.push_step(Step::Descendent(key))
                 } else {
                     self.eat_whitespaces();
                     match self.peek() {
                         Some(LEFT_BRACKET) => {
-                            let field_name = &self.input[begin..self.pos];
+                            let field_name = &self.input[begin..end];
                             self.parse_item_method(field_name)
                         }
                         Some(DOT) | Some(BEGIN_ARRAY) | None => {
-                            let key = self.create_key::<false>(begin, self.pos)?;
+                            let key = self.create_key::<false>(begin, end)?;
                             self.push_step(Step::Object(ObjectStep::Key(key)))
                         }
                         _ => Err(PathParseError::new(
@@ -581,11 +582,35 @@ mod tests {
         let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
         assert_path_parse(input, &expected);
 
+        let input = "$.  key";
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = "$.key  ";
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = "$.  key  ";
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
+        assert_path_parse(input, &expected);
+
         let input = "    $.key";
         let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
         assert_path_parse(input, &expected);
 
         let input = r#"$."key""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$.  "key""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."key"  "#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$.  "key"  "#;
         let expected = vec![Step::Root, Step::Object(ObjectStep::Key("key".to_string()))];
         assert_path_parse(input, &expected);
 
