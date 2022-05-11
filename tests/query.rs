@@ -169,6 +169,42 @@ fn test_query() {
 
     let path = "$[1]";
     assert_query(input, path, None);
+
+    let input = r#"[]"#;
+    let path = r#"$[last]"#;
+    assert_query(input, path, None);
+
+    let input = r#"[1]"#;
+    let path = r#"$[last]"#;
+    assert_query(input, path, Some("1"));
+
+    let input = r#"[[1]]"#;
+    let path = r#"$[last]"#;
+    assert_query(input, path, Some(r#"[1]"#));
+
+    let input = r#"[1]"#;
+    let path = r#"$[last-1]"#;
+    assert_query(input, path, None);
+
+    let input = r#"[1]"#;
+    let path = r#"$[1 to 1]"#;
+    assert_query(input, path, None);
+
+    let input = r#"[1]"#;
+    let path = r#"$[0 to 1]"#;
+    assert_query(input, path, Some("1"));
+
+    let input = r#"[1]"#;
+    let path = r#"$[0 to 0]"#;
+    assert_query(input, path, Some("1"));
+
+    let input = r#"[1]"#;
+    let path = r#"$[2 to 3]"#;
+    assert_query(input, path, None);
+
+    let input = r#"[1]"#;
+    let path = r#"$[0 to last]"#;
+    assert_query(input, path, Some("1"));
 }
 
 #[test]
@@ -329,6 +365,26 @@ fn test_query_with_wrapper() {
     let path = r#"$.key.key.key.key"#;
     let expected = r#"[123]"#;
     assert_query_with_wrapper(input, path, Some(expected));
+
+    let input = r#"[1, 2]"#;
+    let path = r#"$[last-4 to 0]"#;
+    assert_query_with_wrapper(input, path, Some("[1]"));
+
+    let input = r#"[1, 2]"#;
+    let path = r#"$[last-4 to 1]"#;
+    assert_query_with_wrapper(input, path, Some("[1, 2]"));
+
+    let input = r#"[1, 2]"#;
+    let path = r#"$[last-4 to 2]"#;
+    assert_query_with_wrapper(input, path, Some("[1, 2]"));
+
+    let input = r#"[1, 2]"#;
+    let path = r#"$[1 to last-3]"#;
+    assert_query_with_wrapper(input, path, Some("[1, 2]"));
+
+    let input = r#"[1, 2]"#;
+    let path = r#"$[last-4 to last-3]"#;
+    assert_query_with_wrapper(input, path, None);
 }
 
 #[test]

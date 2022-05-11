@@ -163,7 +163,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             DataType::Array => {
                 let array = unsafe { value.array()? };
                 let len = array.len()?;
-                if len - 1 > minus {
+                if len > minus {
                     let val = unsafe { array.lazy_get_unchecked(len - 1 - minus)? };
                     return self.query_internal(val, step_index + 1);
                 }
