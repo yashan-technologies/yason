@@ -190,6 +190,10 @@ impl<'a, 'b> Selector<'a, 'b> {
             DataType::Array => {
                 let array = unsafe { value.array()? };
                 let len = array.len()?;
+                if len == 0 {
+                    return Ok(false);
+                }
+
                 if let Some((b, e)) = find_range(begin, end, len) {
                     for i in b..e + 1 {
                         let val = unsafe { array.lazy_get_unchecked(i)? };
@@ -201,7 +205,7 @@ impl<'a, 'b> Selector<'a, 'b> {
                 }
             }
             _ => {
-                if find_range(begin, end, 1).is_some() {
+                if non_array_range_step_relaxed_match(begin, end) {
                     return self.query_internal(value, step_index + 1);
                 }
             }
@@ -219,10 +223,14 @@ impl<'a, 'b> Selector<'a, 'b> {
         match value.data_type() {
             DataType::Array => {
                 let array = unsafe { value.array()? };
+                let len = array.len()?;
+                if len == 0 {
+                    return Ok(false);
+                }
+
                 let mut arr_steps_index = 0;
                 while arr_steps_index < arr_steps.len() {
                     let cur_step = &arr_steps[arr_steps_index];
-                    let len = array.len()?;
 
                     match cur_step {
                         SingleStep::Single(single_index) => match single_index {
@@ -236,7 +244,7 @@ impl<'a, 'b> Selector<'a, 'b> {
                                 }
                             }
                             SingleIndex::Last(minus) => {
-                                if len - 1 > *minus {
+                                if len > *minus {
                                     let val = unsafe { array.lazy_get_unchecked(len - 1 - minus)? };
                                     let found = self.query_internal(val, step_index + 1)?;
                                     if self.for_exists && found {
@@ -261,7 +269,7 @@ impl<'a, 'b> Selector<'a, 'b> {
                 }
             }
             _ => {
-                if non_array_relaxed_match(arr_steps) {
+                if non_array_multi_steps_relaxed_match(arr_steps) {
                     return self.query_internal(value, step_index + 1);
                 }
             }
@@ -363,7 +371,7 @@ impl<'a, 'b> Selector<'a, 'b> {
 }
 
 #[inline]
-fn non_array_relaxed_match(steps: &[SingleStep]) -> bool {
+fn non_array_multi_steps_relaxed_match(steps: &[SingleStep]) -> bool {
     for step in steps {
         match step {
             SingleStep::Single(single_index) => match single_index {
@@ -380,17 +388,24 @@ fn non_array_relaxed_match(steps: &[SingleStep]) -> bool {
             },
 
             SingleStep::Range(left_field, right_field) => {
-                let (left, right) = match (left_field, right_field) {
-                    (SingleIndex::Index(i1), SingleIndex::Index(i2))
-                    | (SingleIndex::Index(i1), SingleIndex::Last(i2))
-                    | (SingleIndex::Last(i1), SingleIndex::Index(i2))
-                    | (SingleIndex::Last(i1), SingleIndex::Last(i2)) => (i1, i2),
-                };
-                if *left == 0 || *right == 0 {
-                    return true;
-                }
+                return non_array_range_step_relaxed_match(left_field, right_field);
             }
         }
+    }
+
+    false
+}
+
+#[inline]
+fn non_array_range_step_relaxed_match(begin: &SingleIndex, end: &SingleIndex) -> bool {
+    let (left, right) = match (begin, end) {
+        (SingleIndex::Index(i1), SingleIndex::Index(i2))
+        | (SingleIndex::Index(i1), SingleIndex::Last(i2))
+        | (SingleIndex::Last(i1), SingleIndex::Index(i2))
+        | (SingleIndex::Last(i1), SingleIndex::Last(i2)) => (i1, i2),
+    };
+    if *left == 0 || *right == 0 {
+        return true;
     }
 
     false
@@ -404,6 +419,7 @@ fn find_range(begin: &SingleIndex, end: &SingleIndex, len: usize) -> Option<(usi
         Some((b, e))
     }
 
+    debug_assert!(len != 0);
     let last = len - 1;
     match (begin, end) {
         (SingleIndex::Index(i1), SingleIndex::Index(i2)) => inner(*i1, *i2, len),
