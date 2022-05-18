@@ -237,28 +237,32 @@ impl<'a> PathParser<'a> {
 
     #[inline]
     fn parse_array_cell(&mut self, steps: &mut Vec<SingleStep>) -> PathParseResult<()> {
-        let begin = self.parse_last_or_index()?;
-        steps
-            .try_reserve(std::mem::size_of::<Step>())
-            .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+        loop {
+            let begin = self.parse_last_or_index()?;
+            steps
+                .try_reserve(std::mem::size_of::<Step>())
+                .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
 
-        self.eat_whitespaces();
-        if self.has_keyword(TO) {
-            self.advance(TO.len());
             self.eat_whitespaces();
+            if self.has_keyword(TO) {
+                self.advance(TO.len());
+                self.eat_whitespaces();
 
-            let end = self.parse_last_or_index()?;
-            steps.push(SingleStep::Range(begin, end));
-        } else {
-            steps.push(SingleStep::Single(begin));
+                let end = self.parse_last_or_index()?;
+                steps.push(SingleStep::Range(begin, end));
+            } else {
+                steps.push(SingleStep::Single(begin));
+            }
+
+            self.eat_whitespaces();
+            if self.peek() == Some(COMMA) {
+                self.advance(CTRL_CHAR_LEN);
+                self.eat_whitespaces();
+            } else {
+                break;
+            }
         }
 
-        self.eat_whitespaces();
-        if self.peek() == Some(COMMA) {
-            self.advance(CTRL_CHAR_LEN);
-            self.eat_whitespaces();
-            self.parse_array_cell(steps)?;
-        }
         Ok(())
     }
 
