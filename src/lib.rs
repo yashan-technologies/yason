@@ -106,10 +106,7 @@
 //! // or the value itself if it is small enough to be inlined (that is 4 bytes).
 //! offset-or-inlined-value ::= uint32
 //!
-//! outlined-value ::=
-//!     scalar |
-//!     object-type object |
-//!     array-type array
+//! outlined-value ::= type value
 //! ```
 //!
 //! ## Usage

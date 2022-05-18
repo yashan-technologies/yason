@@ -1,6 +1,6 @@
 //! Object manipulation.
 
-use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, KEY_LENGTH_SIZE, KEY_OFFSET_SIZE, OBJECT_SIZE};
+use crate::binary::{DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, KEY_LENGTH_SIZE, KEY_OFFSET_SIZE, OBJECT_SIZE};
 use crate::yason::array::Array;
 use crate::yason::{LazyValue, Value, Yason, YasonResult};
 use crate::{DataType, Number};
@@ -57,7 +57,7 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    pub fn yason(&self) -> &Yason {
+    pub fn yason(&self) -> &'a Yason {
         self.0
     }
 
@@ -131,7 +131,7 @@ impl<'a> Object<'a> {
         let found = self.check_key(key.as_ref(), DataType::Object)?;
 
         if let Some(value_pos) = found {
-            return Ok(Some(self.read_object(value_pos)?));
+            return Ok(Some(self.0.read_object(value_pos)?));
         }
         Ok(None)
     }
@@ -143,7 +143,7 @@ impl<'a> Object<'a> {
         let found = self.check_key(key.as_ref(), DataType::Array)?;
 
         if let Some(value_pos) = found {
-            return Ok(Some(self.read_array(value_pos)?));
+            return Ok(Some(self.0.read_array(value_pos)?));
         }
         Ok(None)
     }
@@ -155,7 +155,7 @@ impl<'a> Object<'a> {
         let found = self.check_key(key.as_ref(), DataType::String)?;
 
         if let Some(value_pos) = found {
-            return Ok(Some(self.read_string(value_pos)?));
+            return Ok(Some(self.0.read_string(value_pos)?));
         }
         Ok(None)
     }
@@ -167,7 +167,7 @@ impl<'a> Object<'a> {
         let found = self.check_key(key.as_ref(), DataType::Number)?;
 
         if let Some(value_pos) = found {
-            return Ok(Some(self.read_number(value_pos)?));
+            return Ok(Some(self.0.read_number(value_pos)?));
         }
         Ok(None)
     }
@@ -179,7 +179,7 @@ impl<'a> Object<'a> {
         let found = self.check_key(key.as_ref(), DataType::Bool)?;
 
         if let Some(value_pos) = found {
-            return Ok(Some(self.read_bool(value_pos)?));
+            return Ok(Some(self.0.read_bool(value_pos)?));
         }
         Ok(None)
     }
@@ -232,49 +232,14 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    fn read_size(&self, value_pos: usize) -> YasonResult<i32> {
-        let size_pos = value_pos + DATA_TYPE_SIZE;
-        self.0.read_i32(size_pos)
-    }
-
-    #[inline]
-    pub(crate) fn read_object(&self, value_pos: usize) -> YasonResult<Object<'a>> {
-        let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
-        let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
-        Ok(unsafe { Object::new_unchecked(yason) })
-    }
-
-    #[inline]
-    pub(crate) fn read_array(&self, value_pos: usize) -> YasonResult<Array<'a>> {
-        let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
-        let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
-        Ok(unsafe { Array::new_unchecked(yason) })
-    }
-
-    #[inline]
-    fn read_string(&self, value_pos: usize) -> YasonResult<&'a str> {
-        self.0.read_string(value_pos + DATA_TYPE_SIZE)
-    }
-
-    #[inline]
-    fn read_number(&self, value_pos: usize) -> YasonResult<Number> {
-        self.0.read_number(value_pos + DATA_TYPE_SIZE)
-    }
-
-    #[inline]
-    fn read_bool(&self, value_pos: usize) -> YasonResult<bool> {
-        self.0.read_bool(value_pos + DATA_TYPE_SIZE)
-    }
-
-    #[inline]
     fn read_value(&self, value_pos: usize) -> YasonResult<Value<'a>> {
         let data_type = self.0.read_type(value_pos)?;
         let value = match data_type {
-            DataType::Object => Value::Object(self.read_object(value_pos)?),
-            DataType::Array => Value::Array(self.read_array(value_pos)?),
-            DataType::String => Value::String(self.read_string(value_pos)?),
-            DataType::Number => Value::Number(self.read_number(value_pos)?),
-            DataType::Bool => Value::Bool(self.read_bool(value_pos)?),
+            DataType::Object => Value::Object(self.0.read_object(value_pos)?),
+            DataType::Array => Value::Array(self.0.read_array(value_pos)?),
+            DataType::String => Value::String(self.0.read_string(value_pos)?),
+            DataType::Number => Value::Number(self.0.read_number(value_pos)?),
+            DataType::Bool => Value::Bool(self.0.read_bool(value_pos)?),
             DataType::Null => Value::Null,
         };
         Ok(value)

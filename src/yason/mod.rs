@@ -6,7 +6,7 @@ mod object;
 pub use crate::yason::array::{Array, ArrayIter};
 pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 
-use crate::binary::{DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE};
+use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE, OBJECT_SIZE};
 use crate::format::{CompactFormatter, FormatResult, Formatter, LazyFormat, PrettyFormatter};
 use crate::util::decode_varint;
 use crate::{BuildError, DataType, Number, Scalar};
@@ -170,53 +170,65 @@ impl Yason {
     #[inline]
     pub fn object(&self) -> YasonResult<Object> {
         self.check_type(0, DataType::Object)?;
-        Ok(unsafe { Object::new_unchecked(self) })
+        unsafe { self.object_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn object_unchecked(&self) -> YasonResult<Object> {
+        debug_assert!(self.data_type()? == DataType::Object);
+        Ok(Object::new_unchecked(self))
     }
 
     /// If `Yason` is `Array`, return its value. Returns `YasonError` otherwise.
     #[inline]
     pub fn array(&self) -> YasonResult<Array> {
         self.check_type(0, DataType::Array)?;
-        Ok(unsafe { Array::new_unchecked(self) })
+        unsafe { self.array_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn array_unchecked(&self) -> YasonResult<Array> {
+        debug_assert!(self.data_type()? == DataType::Array);
+        Ok(Array::new_unchecked(self))
     }
 
     /// If `Yason` is `String`, return its value. Returns `YasonError` otherwise.
     #[inline]
     pub fn string(&self) -> YasonResult<&str> {
         self.check_type(0, DataType::String)?;
-        self.read_string(DATA_TYPE_SIZE)
+        unsafe { self.string_unchecked() }
     }
 
     #[inline]
     pub(crate) unsafe fn string_unchecked(&self) -> YasonResult<&str> {
         debug_assert!(self.data_type()? == DataType::String);
-        self.read_string(DATA_TYPE_SIZE)
+        self.read_string(0)
     }
 
     /// If `Yason` is `Number`, return its value. Returns `YasonError` otherwise.
     #[inline]
     pub fn number(&self) -> YasonResult<Number> {
         self.check_type(0, DataType::Number)?;
-        self.read_number(DATA_TYPE_SIZE)
+        unsafe { self.number_unchecked() }
     }
 
     #[inline]
     pub(crate) unsafe fn number_unchecked(&self) -> YasonResult<Number> {
         debug_assert!(self.data_type()? == DataType::Number);
-        self.read_number(DATA_TYPE_SIZE)
+        self.read_number(0)
     }
 
     /// If `Yason` is `Bool`, return its value. Returns `YasonError` otherwise.
     #[inline]
     pub fn bool(&self) -> YasonResult<bool> {
         self.check_type(0, DataType::Bool)?;
-        self.read_bool(DATA_TYPE_SIZE)
+        unsafe { self.bool_unchecked() }
     }
 
     #[inline]
     pub(crate) unsafe fn bool_unchecked(&self) -> YasonResult<bool> {
         debug_assert!(self.data_type()? == DataType::Bool);
-        self.read_bool(DATA_TYPE_SIZE)
+        self.read_bool(0)
     }
 
     /// If `Yason` is `Null`, return true. Returns false otherwise.
@@ -326,16 +338,32 @@ impl Yason {
     }
 
     #[inline]
-    fn read_string(&self, pos: usize) -> YasonResult<&str> {
-        let (data_length, data_length_len) = decode_varint(&self.bytes, pos)?;
-        let end = pos + data_length_len + data_length as usize;
-        let bytes = self.slice(pos + data_length_len, end)?;
+    fn read_object(&self, index: usize) -> YasonResult<Object> {
+        let size = self.read_i32(index + DATA_TYPE_SIZE)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
+        let yason = unsafe { Yason::new_unchecked(self.slice(index, size + index)?) };
+        Ok(unsafe { Object::new_unchecked(yason) })
+    }
+
+    #[inline]
+    fn read_array(&self, index: usize) -> YasonResult<Array> {
+        let size = self.read_i32(index + DATA_TYPE_SIZE)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
+        let yason = unsafe { Yason::new_unchecked(self.slice(index, size + index)?) };
+        Ok(unsafe { Array::new_unchecked(yason) })
+    }
+
+    #[inline]
+    fn read_string(&self, index: usize) -> YasonResult<&str> {
+        let index = index + DATA_TYPE_SIZE;
+        let (data_length, data_length_len) = decode_varint(&self.bytes, index)?;
+        let end = index + data_length_len + data_length as usize;
+        let bytes = self.slice(index + data_length_len, end)?;
         let string = unsafe { std::str::from_utf8_unchecked(bytes) };
         Ok(string)
     }
 
     #[inline]
     fn read_number(&self, index: usize) -> YasonResult<Number> {
+        let index = index + DATA_TYPE_SIZE;
         let data_length = self.get(index)? as usize;
         let end = index + NUMBER_LENGTH_SIZE + data_length;
         let bytes = self.slice(index + NUMBER_LENGTH_SIZE, end)?;
@@ -344,7 +372,7 @@ impl Yason {
 
     #[inline]
     fn read_bool(&self, index: usize) -> YasonResult<bool> {
-        Ok(self.read_u8(index)? == 1)
+        Ok(self.read_u8(index + DATA_TYPE_SIZE)? == 1)
     }
 
     #[inline]
@@ -497,7 +525,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
         if IN_ARRAY {
             Array::new_unchecked(self.yason).read_object(self.value_pos)
         } else {
-            Object::new_unchecked(self.yason).read_object(self.value_pos)
+            self.yason.read_object(self.value_pos)
         }
     }
 
@@ -507,7 +535,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
         if IN_ARRAY {
             Array::new_unchecked(self.yason).read_array(self.value_pos)
         } else {
-            Object::new_unchecked(self.yason).read_array(self.value_pos)
+            self.yason.read_array(self.value_pos)
         }
     }
 
@@ -517,7 +545,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
         if IN_ARRAY {
             Array::new_unchecked(self.yason).read_string(self.value_pos)
         } else {
-            self.yason.read_string(self.value_pos + DATA_TYPE_SIZE)
+            self.yason.read_string(self.value_pos)
         }
     }
 
@@ -527,7 +555,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
         if IN_ARRAY {
             Array::new_unchecked(self.yason).read_number(self.value_pos)
         } else {
-            self.yason.read_number(self.value_pos + DATA_TYPE_SIZE)
+            self.yason.read_number(self.value_pos)
         }
     }
 
@@ -537,7 +565,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
         if IN_ARRAY {
             Array::new_unchecked(self.yason).read_bool(self.value_pos)
         } else {
-            self.yason.read_bool(self.value_pos + DATA_TYPE_SIZE)
+            self.yason.read_bool(self.value_pos)
         }
     }
 

@@ -224,7 +224,7 @@ impl<'a> Array<'a> {
     #[inline]
     pub(crate) fn read_bool(&self, value_entry_pos: usize) -> YasonResult<bool> {
         // bool can be inlined
-        Ok(self.0.read_u32(value_entry_pos + DATA_TYPE_SIZE)? == 1)
+        Ok(self.0.read_u8(value_entry_pos + DATA_TYPE_SIZE)? == 1)
     }
 
     #[inline]

@@ -122,10 +122,11 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
 
     #[inline]
     fn push_string(&mut self, value: &str) -> BuildResult<()> {
-        let size = MAX_DATA_LENGTH_SIZE + value.len();
+        let size = DATA_TYPE_SIZE + MAX_DATA_LENGTH_SIZE + value.len();
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
             bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
             bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::String);
             bytes.push_string(value)?;
             Ok(())
         };
@@ -134,10 +135,11 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
 
     #[inline]
     fn push_number(&mut self, value: &Number) -> BuildResult<()> {
-        let size = MAX_BINARY_SIZE + NUMBER_LENGTH_SIZE;
+        let size = DATA_TYPE_SIZE + MAX_BINARY_SIZE + NUMBER_LENGTH_SIZE;
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
             bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
             bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Number);
             bytes.push_number(value);
             Ok(())
         };
