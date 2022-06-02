@@ -145,7 +145,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {
                 if index == 0 {
-                    return self.query_internal(value, step_index + 1);
+                    return self.non_array_relax_match(value, step_index + 1);
                 }
             }
         }
@@ -170,7 +170,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {
                 if minus == 0 {
-                    return self.query_internal(value, step_index + 1);
+                    return self.non_array_relax_match(value, step_index + 1);
                 }
             }
         }
@@ -206,7 +206,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {
                 if non_array_range_step_relaxed_match(begin, end) {
-                    return self.query_internal(value, step_index + 1);
+                    return self.non_array_relax_match(value, step_index + 1);
                 }
             }
         }
@@ -270,7 +270,7 @@ impl<'a, 'b> Selector<'a, 'b> {
             }
             _ => {
                 if non_array_multi_steps_relaxed_match(arr_steps) {
-                    return self.query_internal(value, step_index + 1);
+                    return self.non_array_relax_match(value, step_index + 1);
                 }
             }
         }
@@ -293,10 +293,54 @@ impl<'a, 'b> Selector<'a, 'b> {
                     }
                 }
             }
-            _ => return self.query_internal(value, step_index + 1),
+            _ => return self.non_array_relax_match(value, step_index + 1),
         }
 
         Ok(false)
+    }
+
+    #[inline]
+    fn non_array_relax_match<const IN_ARRAY: bool>(
+        &mut self,
+        value: LazyValue<'a, IN_ARRAY>,
+        step_index: usize,
+    ) -> YasonResult<bool> {
+        let mut cur_step_index = step_index;
+        loop {
+            let step = &self.steps[cur_step_index];
+            match step {
+                Step::Array(array_step) => match array_step {
+                    ArrayStep::Index(index) => {
+                        if *index == 0 {
+                            cur_step_index += 1;
+                        }
+                    }
+                    ArrayStep::Last(minus) => {
+                        if *minus == 0 {
+                            cur_step_index += 1;
+                        }
+                    }
+                    ArrayStep::Range(begin, end) => {
+                        if non_array_range_step_relaxed_match(begin, end) {
+                            cur_step_index += 1;
+                        }
+                    }
+                    ArrayStep::Multiple(steps) => {
+                        if non_array_multi_steps_relaxed_match(steps) {
+                            cur_step_index += 1;
+                        }
+                    }
+                    ArrayStep::Wildcard => {
+                        cur_step_index += 1;
+                    }
+                },
+                _ => return self.query_internal(value, cur_step_index),
+            }
+
+            if cur_step_index >= self.steps.len() {
+                return self.query_internal(value, cur_step_index);
+            }
+        }
     }
 
     #[inline]
