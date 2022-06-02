@@ -306,7 +306,8 @@ impl<'a, 'b> Selector<'a, 'b> {
         step_index: usize,
     ) -> YasonResult<bool> {
         let mut cur_step_index = step_index;
-        loop {
+
+        while cur_step_index < self.steps.len() {
             let step = &self.steps[cur_step_index];
             match step {
                 Step::Array(array_step) => match array_step {
@@ -336,11 +337,9 @@ impl<'a, 'b> Selector<'a, 'b> {
                 },
                 _ => return self.query_internal(value, cur_step_index),
             }
-
-            if cur_step_index >= self.steps.len() {
-                return self.query_internal(value, cur_step_index);
-            }
         }
+
+        self.query_internal(value, cur_step_index)
     }
 
     #[inline]
@@ -432,7 +431,9 @@ fn non_array_multi_steps_relaxed_match(steps: &[SingleStep]) -> bool {
             },
 
             SingleStep::Range(left_field, right_field) => {
-                return non_array_range_step_relaxed_match(left_field, right_field);
+                if non_array_range_step_relaxed_match(left_field, right_field) {
+                    return true;
+                }
             }
         }
     }
