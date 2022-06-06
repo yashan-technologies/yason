@@ -15,7 +15,7 @@ pub enum DataType {
     Null = 6,
 }
 
-const DATA_TYPE_NAME: [&str; 7] = ["invalid", "object", "array", "string", "number", "bool", "null"];
+const DATA_TYPE_NAME: [&str; 7] = ["invalid", "object", "array", "string", "number", "boolean", "null"];
 
 impl DataType {
     #[inline]
