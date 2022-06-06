@@ -89,8 +89,9 @@ impl PathExpression {
         &self.0
     }
 
+    /// Returns whether an item method exists in path expression.
     #[inline]
-    fn has_method(&self) -> bool {
+    pub fn has_method(&self) -> bool {
         let len = self.0.len();
         if len <= 1 {
             return false;
