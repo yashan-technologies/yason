@@ -4,7 +4,6 @@ use crate::path::parse::{ArrayStep, FuncStep, ObjectStep, SingleIndex, SingleSte
 use crate::path::push_value;
 use crate::yason::{LazyValue, YasonResult};
 use crate::{DataType, Number, Value, Yason, YasonError};
-use std::cmp::Ordering;
 
 pub struct Selector<'a, 'b> {
     steps: &'b [Step],
@@ -194,7 +193,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                     return Ok(false);
                 }
 
-                if let Some((b, e)) = find_range(begin, end, len) {
+                let last = len - 1;
+                if let Some((b, e)) = find_range(begin, end, last) {
                     for i in b..e + 1 {
                         let val = unsafe { array.lazy_get_unchecked(i)? };
                         let found = self.query_internal(val, step_index + 1)?;
@@ -254,7 +254,8 @@ impl<'a, 'b> Selector<'a, 'b> {
                             }
                         },
                         SingleStep::Range(begin, end) => {
-                            if let Some((b, e)) = find_range(begin, end, len) {
+                            let last = len - 1;
+                            if let Some((b, e)) = find_range(begin, end, last) {
                                 for i in b..e + 1 {
                                     let val = unsafe { array.lazy_get_unchecked(i)? };
                                     let found = self.query_internal(val, step_index + 1)?;
@@ -443,38 +444,72 @@ fn non_array_multi_steps_relaxed_match(steps: &[SingleStep]) -> bool {
 
 #[inline]
 fn non_array_range_step_relaxed_match(begin: &SingleIndex, end: &SingleIndex) -> bool {
-    let (left, right) = match (begin, end) {
-        (SingleIndex::Index(i1), SingleIndex::Index(i2))
-        | (SingleIndex::Index(i1), SingleIndex::Last(i2))
-        | (SingleIndex::Last(i1), SingleIndex::Index(i2))
-        | (SingleIndex::Last(i1), SingleIndex::Last(i2)) => (i1, i2),
-    };
-    if *left == 0 || *right == 0 {
-        return true;
+    // For non-array types, an array of size 1 is automatically encapsulated for relaxed matching
+    // and only index 0 can be matched.
+    if let Some((b, _)) = find_range(begin, end, 0) {
+        if b == 0 {
+            return true;
+        }
     }
 
     false
 }
 
+// Find the index range to traverse based on the two SingleIndexes, both sides of this range are closed.
+// For example, if the return value is Some((1, 3)), the indexes that need to be traversed are 1, 2, 3.
+// The argument `last` is equal to the last index of the array (last = array.len() - 1).
 #[inline]
-fn find_range(begin: &SingleIndex, end: &SingleIndex, len: usize) -> Option<(usize, usize)> {
-    fn inner(u1: usize, u2: usize, len: usize) -> Option<(usize, usize)> {
-        let b = u1.min(u2);
-        let e = u1.max(u2).min(len - 1);
-        Some((b, e))
+fn find_range(begin: &SingleIndex, end: &SingleIndex, last: usize) -> Option<(usize, usize)> {
+    #[inline]
+    fn find_range_by_index(begin_index: usize, end_index: usize, last: usize) -> Option<(usize, usize)> {
+        debug_assert!(begin_index <= end_index);
+        let end_index = end_index.min(last);
+        if begin_index <= end_index {
+            Some((begin_index, end_index))
+        } else {
+            None
+        }
     }
 
-    debug_assert!(len != 0);
-    let last = len - 1;
+    #[inline]
+    fn find_range_by_last(minus1: usize, minus2: usize, last: usize) -> Option<(usize, usize)> {
+        debug_assert!(minus1 <= minus2);
+        let begin_index = last.saturating_sub(minus2);
+
+        if minus1 <= last {
+            Some((begin_index, last - minus1))
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn order(l: usize, r: usize) -> (usize, usize) {
+        if l <= r {
+            (l, r)
+        } else {
+            (r, l)
+        }
+    }
+
     match (begin, end) {
-        (SingleIndex::Index(i1), SingleIndex::Index(i2)) => inner(*i1, *i2, len),
-        (SingleIndex::Index(index), SingleIndex::Last(minus)) => inner(*index, last.max(*minus) - minus, len),
-        (SingleIndex::Last(minus), SingleIndex::Index(index)) => inner(last.max(*minus) - minus, *index, len),
-        (SingleIndex::Last(m1), SingleIndex::Last(m2)) => match (last.cmp(m1), last.cmp(m2)) {
-            (Ordering::Less, Ordering::Less) => None,
-            (Ordering::Less, _) => inner(0, last - m2, len),
-            (_, Ordering::Less) => inner(last - m1, 0, len),
-            _ => inner(last - m1, last - m2, len),
-        },
+        (SingleIndex::Index(i1), SingleIndex::Index(i2)) => {
+            let (begin_index, end_index) = order(*i1, *i2);
+            find_range_by_index(begin_index, end_index, last)
+        }
+        (SingleIndex::Index(i1), SingleIndex::Last(minus)) => {
+            let i2 = last.saturating_sub(*minus);
+            let (begin_index, end_index) = order(*i1, i2);
+            find_range_by_index(begin_index, end_index, last)
+        }
+        (SingleIndex::Last(minus), SingleIndex::Index(i2)) => {
+            let i1 = last.saturating_sub(*minus);
+            let (begin_index, end_index) = order(i1, *i2);
+            find_range_by_index(begin_index, end_index, last)
+        }
+        (SingleIndex::Last(m1), SingleIndex::Last(m2)) => {
+            let (minus1, minus2) = order(*m1, *m2);
+            find_range_by_last(minus1, minus2, last)
+        }
     }
 }

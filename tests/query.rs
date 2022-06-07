@@ -217,6 +217,19 @@ fn test_query() {
     let input = r#"[]"#;
     let path = r#"$[1, last, 0 to 1]"#;
     assert_query(input, path, None);
+
+    let input = r#"["test", {"test":["a", "b", "c", "d", "e", "f", "g"]}, {"a":{"test":true}}, {"b":{"test":[11.34, 4, 5, null, 10, {"test":1}]}} ]"#;
+    let path = r#"$[0][last - 2 to 0]"#;
+    let expected = r#""test""#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$[0][last - 2 to 3]"#;
+    let expected = r#""test""#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$[0][3 to last - 2]"#;
+    let expected = r#""test""#;
+    assert_query(input, path, Some(expected));
 }
 
 #[test]
@@ -415,6 +428,25 @@ fn test_query_with_wrapper() {
 
     let path = "$[0 to 1, 3 to 2][3 to 2, 1 to 0][0]";
     let expected = r#"[1,"test5",1,"test3","test4","3C","3D","3A","3B",{"a":[1,2,3,4,56,7],"b":[8,9,10]}]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
+    let input = r#"["test", {"test":["a", "b", "c", "d", "e", "f", "g"]}, {"a":{"test":true}}, {"b":{"test":[11.34, 4, 5, null, 10, {"test":1}]}} ]"#;
+    let path = r#"$..test[last-1 to 0, last-2 to 1][last-10 to 10]"#;
+    let expected = r#"["a", "b", "c", "d", "e", "f", "b", "c", "d", "e", true, 11.34, 4, 5, null, 10, 4, 5, null, 1]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
+    let input = r#"["test", {"test":["a", "b", "c", "d", "e", "f", "g"]}, {"a":{"test":true}}, {"b":{"test":[11.34, 4, 5, null, 10, {"test":1}]}} ]"#;
+    let path = r#"$[0][last - 2 to 3]"#;
+    let expected = r#"["test"]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
+    let input = r#"["test", {"test":["a", "b", "c", "d", "e", "f", "g"]}, {"a":{"test":true}}, {"b":{"test":[11.34, 4, 5, null, 10, {"test":1}]}} ]"#;
+    let path = r#"$[0][last - 2 to 0]"#;
+    let expected = r#"["test"]"#;
+    assert_query_with_wrapper(input, path, Some(expected));
+
+    let path = r#"$[0][3 to last - 2]"#;
+    let expected = r#"["test"]"#;
     assert_query_with_wrapper(input, path, Some(expected));
 
     let input = "[1]";
