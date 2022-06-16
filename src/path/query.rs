@@ -315,21 +315,29 @@ impl<'a, 'b> Selector<'a, 'b> {
                     ArrayStep::Index(index) => {
                         if *index == 0 {
                             cur_step_index += 1;
+                        } else {
+                            return Ok(false);
                         }
                     }
                     ArrayStep::Last(minus) => {
                         if *minus == 0 {
                             cur_step_index += 1;
+                        } else {
+                            return Ok(false);
                         }
                     }
                     ArrayStep::Range(begin, end) => {
                         if non_array_range_step_relaxed_match(begin, end) {
                             cur_step_index += 1;
+                        } else {
+                            return Ok(false);
                         }
                     }
                     ArrayStep::Multiple(steps) => {
                         if non_array_multi_steps_relaxed_match(steps) {
                             cur_step_index += 1;
+                        } else {
+                            return Ok(false);
                         }
                     }
                     ArrayStep::Wildcard => {
