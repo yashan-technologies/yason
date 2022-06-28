@@ -183,7 +183,7 @@ impl<'a> PathParser<'a> {
                     return Err(PathParseError::new(
                         PathParseErrorKind::InvalidCharacterAtStepStart,
                         self.pos,
-                    ))
+                    ));
                 }
             }
             self.eat_whitespaces();
@@ -286,7 +286,10 @@ impl<'a> PathParser<'a> {
                 self.eat_whitespaces();
                 match self.peek() {
                     Some(char) if char.is_ascii_digit() => Ok(SingleIndex::Last(self.parse_index()?)),
-                    _ => Err(PathParseError::new(PathParseErrorKind::ArrayStepSyntaxError, self.pos)),
+                    _ => Err(PathParseError::new(
+                        PathParseErrorKind::ArrayStepSyntaxError,
+                        self.pos + 1,
+                    )),
                 }
             }
             None => Err(PathParseError::new(PathParseErrorKind::MissingSquareBracket, self.pos)),
@@ -302,7 +305,10 @@ impl<'a> PathParser<'a> {
                 Ok(SingleIndex::Index(index))
             }
             None => Err(PathParseError::new(PathParseErrorKind::MissingSquareBracket, self.pos)),
-            _ => Err(PathParseError::new(PathParseErrorKind::ArrayStepSyntaxError, self.pos)),
+            _ => Err(PathParseError::new(
+                PathParseErrorKind::ArrayStepSyntaxError,
+                self.pos + 1,
+            )),
         }
     }
 
@@ -331,7 +337,7 @@ impl<'a> PathParser<'a> {
         for &i in digits {
             res = res * 10 + (i - b'0') as usize;
             if res > i32::MAX as usize {
-                return Err(PathParseError::new(PathParseErrorKind::ArrayIndexTooLong, self.pos));
+                return Err(PathParseError::new(PathParseErrorKind::ArrayIndexTooLong, begin + 1));
             }
         }
 
@@ -407,7 +413,7 @@ impl<'a> PathParser<'a> {
                     match self.peek() {
                         Some(LEFT_BRACKET) => {
                             let field_name = &self.input[begin..end];
-                            self.parse_item_method(field_name)
+                            self.parse_item_method(field_name, begin + 1)
                         }
                         Some(DOT) | Some(BEGIN_ARRAY) | None => {
                             let key = self.create_key::<false>(begin, end)?;
@@ -415,17 +421,17 @@ impl<'a> PathParser<'a> {
                         }
                         _ => Err(PathParseError::new(
                             PathParseErrorKind::UnexpectedCharacterAtEnd,
-                            self.pos,
+                            self.pos + 1,
                         )),
                     }
                 }
             }
-            _ => Err(PathParseError::new(PathParseErrorKind::InvalidKeyStep, self.pos)),
+            _ => Err(PathParseError::new(PathParseErrorKind::InvalidKeyStep, self.pos + 1)),
         }
     }
 
     #[inline]
-    fn parse_item_method(&mut self, field_name: &[u8]) -> PathParseResult<()> {
+    fn parse_item_method(&mut self, field_name: &[u8], begin_pos: usize) -> PathParseResult<()> {
         debug_assert!(self.peek() == Some(LEFT_BRACKET));
         self.advance(CTRL_CHAR_LEN);
         self.eat_whitespaces();
@@ -437,7 +443,7 @@ impl<'a> PathParser<'a> {
             if !self.exhausted() {
                 return Err(PathParseError::new(
                     PathParseErrorKind::UnexpectedCharacterAtEnd,
-                    self.pos,
+                    self.pos + 1,
                 ));
             }
 
@@ -445,10 +451,10 @@ impl<'a> PathParser<'a> {
                 COUNT => self.push_step(Step::Func(FuncStep::Count)),
                 SIZE => self.push_step(Step::Func(FuncStep::Size)),
                 TYPE => self.push_step(Step::Func(FuncStep::Type)),
-                _ => Err(PathParseError::new(PathParseErrorKind::InvalidFunction, self.pos)),
+                _ => Err(PathParseError::new(PathParseErrorKind::InvalidFunction, begin_pos)),
             }
         } else {
-            Err(PathParseError::new(PathParseErrorKind::InvalidFunction, self.pos))
+            Err(PathParseError::new(PathParseErrorKind::InvalidFunction, begin_pos))
         }
     }
 
@@ -754,53 +760,69 @@ mod tests {
     fn test_path_parse_error() {
         let input = "@.key";
         assert_path_parse_error(input, PathParseErrorKind::NotStartWithDollar, 1);
-
+        let input = "   @.key";
+        assert_path_parse_error(input, PathParseErrorKind::NotStartWithDollar, 4);
         let input = "\t$.key";
         assert_path_parse_error(input, PathParseErrorKind::NotStartWithDollar, 1);
 
         let input = "$.key123&.key2";
-        assert_path_parse_error(input, PathParseErrorKind::UnexpectedCharacterAtEnd, 8);
+        assert_path_parse_error(input, PathParseErrorKind::UnexpectedCharacterAtEnd, 9);
+        let input = "$.key123  &.key2";
+        assert_path_parse_error(input, PathParseErrorKind::UnexpectedCharacterAtEnd, 11);
+        let input = "$.size().key";
+        assert_path_parse_error(input, PathParseErrorKind::UnexpectedCharacterAtEnd, 9);
+        let input = "$.size() key";
+        assert_path_parse_error(input, PathParseErrorKind::UnexpectedCharacterAtEnd, 10);
+
+        let input = "$. &key.key2";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 4);
+        let input = "$.";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 2);
+        let input = "$..";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 3);
+        let input = "$.1key";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 3);
+        let input = "$.";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 2);
 
         let input = "$.key[123";
         assert_path_parse_error(input, PathParseErrorKind::MissingSquareBracket, 9);
+        let input = "$.key[*, 1]";
+        assert_path_parse_error(input, PathParseErrorKind::MissingSquareBracket, 8);
+        let input = "$.key[";
+        assert_path_parse_error(input, PathParseErrorKind::MissingSquareBracket, 6);
+        let input = "$.key[last ";
+        assert_path_parse_error(input, PathParseErrorKind::MissingSquareBracket, 11);
+
+        let input = "$a.size()";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidCharacterAtStepStart, 2);
+        let input = "$\t.size()";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidCharacterAtStepStart, 2);
 
         let input = "$.key[abc]";
-        assert_path_parse_error(input, PathParseErrorKind::ArrayStepSyntaxError, 6);
+        assert_path_parse_error(input, PathParseErrorKind::ArrayStepSyntaxError, 7);
+        let input = "$.key[ a";
+        assert_path_parse_error(input, PathParseErrorKind::ArrayStepSyntaxError, 8);
+        let input = "$.key[last - a]";
+        assert_path_parse_error(input, PathParseErrorKind::ArrayStepSyntaxError, 14);
+
+        let input = "$.abs()";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidFunction, 3);
+        let input = "$.size(";
+        assert_path_parse_error(input, PathParseErrorKind::InvalidFunction, 3);
 
         let input = "$.key[]";
         assert_path_parse_error(input, PathParseErrorKind::EmptyArrayStep, 6);
 
-        let input = "$.";
-        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 2);
-
-        let input = "$..";
-        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 3);
-
-        let input = "$.key[";
-        assert_path_parse_error(input, PathParseErrorKind::MissingSquareBracket, 6);
-
         let input = "$.key[12312313131321321231]";
-        assert_path_parse_error(input, PathParseErrorKind::ArrayIndexTooLong, 26);
-
-        let input = r#"$."nam\ae""#;
-        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 8);
+        assert_path_parse_error(input, PathParseErrorKind::ArrayIndexTooLong, 7);
+        let input = "$.key[  12312313131321321231]";
+        assert_path_parse_error(input, PathParseErrorKind::ArrayIndexTooLong, 9);
 
         let input = r#"$."nam"#;
         assert_path_parse_error(input, PathParseErrorKind::UnclosedQuotedStep, 6);
 
-        let input = "$.1key";
-        assert_path_parse_error(input, PathParseErrorKind::InvalidKeyStep, 2);
-
-        let input = "$.abs()";
-        assert_path_parse_error(input, PathParseErrorKind::InvalidFunction, 7);
-
-        let input = "$.size().key";
-        assert_path_parse_error(input, PathParseErrorKind::UnexpectedCharacterAtEnd, 8);
-
-        let input = "$a.size()";
-        assert_path_parse_error(input, PathParseErrorKind::InvalidCharacterAtStepStart, 2);
-
-        let input = "$\t.size()";
-        assert_path_parse_error(input, PathParseErrorKind::InvalidCharacterAtStepStart, 2);
+        let input = r#"$."nam\ae""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 8);
     }
 }
