@@ -26,6 +26,7 @@ pub trait VecExt: Sized {
     fn push_key(&mut self, s: &str);
     fn push_string(&mut self, s: &str) -> BuildResult<()>;
     fn push_number(&mut self, value: &Number);
+    fn try_extend_from_slice(&mut self, other: &[u8]) -> Result<(), TryReserveError>;
 }
 
 impl VecExt for Vec<u8> {
@@ -156,5 +157,12 @@ impl VecExt for Vec<u8> {
         unsafe {
             self.set_len(value_pos + size);
         }
+    }
+
+    #[inline]
+    fn try_extend_from_slice(&mut self, other: &[u8]) -> Result<(), TryReserveError> {
+        self.try_reserve(other.len())?;
+        self.extend_from_slice(other);
+        Ok(())
     }
 }

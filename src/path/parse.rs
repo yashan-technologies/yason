@@ -1,5 +1,6 @@
 //! Path Parser.
 
+use crate::vec::VecExt;
 use crate::PathExpression;
 use std::collections::TryReserveError;
 use std::error::Error;
@@ -359,40 +360,63 @@ impl<'a> PathParser<'a> {
     }
 
     #[inline]
+    fn parse_escape(&mut self, buf: &mut Vec<u8>) -> PathParseResult<()> {
+        buf.try_reserve(1)
+            .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+        match self.pop() {
+            Some(b'b') => buf.push(b'\x08'),
+            Some(b'f') => buf.push(b'\x0c'),
+            Some(b'n') => buf.push(b'\n'),
+            Some(b'r') => buf.push(b'\r'),
+            Some(b't') => buf.push(b'\t'),
+            Some(b'"') => buf.push(b'"'),
+            Some(b'/') => buf.push(b'/'),
+            Some(b'\\') => buf.push(b'\\'),
+            None => return Err(PathParseError::new(PathParseErrorKind::UnclosedQuotedStep, self.pos)),
+            _ => return Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, self.pos)),
+        }
+
+        Ok(())
+    }
+
+    #[inline]
     fn parse_quoted_field_name<const DESCENDENT: bool>(&mut self) -> PathParseResult<()> {
         debug_assert!(self.peek() == Some(DOUBLE_QUOTE));
         self.advance(CTRL_CHAR_LEN);
-        let begin = self.pos;
-        let mut end = None;
-        while let Some(c) = self.pop() {
-            match c {
-                b'\\' => match self.pop() {
-                    Some(b'b') | Some(b'f') | Some(b'n') | Some(b'r') | Some(b't') | Some(b'"') | Some(b'/')
-                    | Some(b'\\') => {
-                        //Skip the next character after a backslash.
-                    }
-                    _ => {
-                        return Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, self.pos));
-                    }
-                },
-                b'"' => {
+
+        let mut buf = Vec::new();
+        let mut begin = self.pos;
+
+        loop {
+            match self.pop() {
+                Some(b'\\') => {
+                    buf.try_extend_from_slice(&self.input[begin..self.pos - 1])
+                        .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+                    self.parse_escape(&mut buf)?;
+                    begin = self.pos;
+                }
+                Some(b'"') => {
                     // An unescaped double quote marks the end of the quoted string.
-                    end = Some(self.pos - 1);
-                    break;
+                    let key = if buf.is_empty() {
+                        // Fast path: return a slice of the raw str without any copying.
+                        self.create_key::<true>(&self.input[begin..self.pos - 1])?
+                    } else {
+                        buf.try_extend_from_slice(&self.input[begin..self.pos - 1])
+                            .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+                        self.create_key::<true>(&buf)?
+                    };
+
+                    return if DESCENDENT {
+                        self.push_step(Step::Descendent(key))
+                    } else {
+                        self.push_step(Step::Object(ObjectStep::Key(key)))
+                    };
+                }
+                None => {
+                    return Err(PathParseError::new(PathParseErrorKind::UnclosedQuotedStep, self.pos));
                 }
                 _ => {}
             }
-        }
-
-        if let Some(end) = end {
-            let key = self.create_key::<true>(begin, end)?;
-            if DESCENDENT {
-                self.push_step(Step::Descendent(key))
-            } else {
-                self.push_step(Step::Object(ObjectStep::Key(key)))
-            }
-        } else {
-            Err(PathParseError::new(PathParseErrorKind::UnclosedQuotedStep, self.pos))
         }
     }
 
@@ -406,7 +430,7 @@ impl<'a> PathParser<'a> {
                 let end = self.pos;
 
                 if DESCENDENT {
-                    let key = self.create_key::<false>(begin, end)?;
+                    let key = self.create_key::<false>(&self.input[begin..end])?;
                     self.push_step(Step::Descendent(key))
                 } else {
                     self.eat_whitespaces();
@@ -416,7 +440,7 @@ impl<'a> PathParser<'a> {
                             self.parse_item_method(field_name, begin + 1)
                         }
                         Some(DOT) | Some(BEGIN_ARRAY) | None => {
-                            let key = self.create_key::<false>(begin, end)?;
+                            let key = self.create_key::<false>(&self.input[begin..end])?;
                             self.push_step(Step::Object(ObjectStep::Key(key)))
                         }
                         _ => Err(PathParseError::new(
@@ -528,18 +552,19 @@ impl<'a> PathParser<'a> {
     }
 
     #[inline]
-    fn create_key<const CHECK_UTF8: bool>(&self, begin: usize, end: usize) -> PathParseResult<String> {
-        let bytes = &self.input[begin..end];
-        let mut key = String::new();
-        key.try_reserve(bytes.len())
-            .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+    fn create_key<const CHECK_UTF8: bool>(&self, bytes: &[u8]) -> PathParseResult<String> {
         let str = if CHECK_UTF8 {
             std::str::from_utf8(bytes).map_err(|_| PathParseError::new(PathParseErrorKind::InvalidKeyStep, self.pos))?
         } else {
             // SAFETY: bytes must only contains [0..9], [a..z] and [A..Z] when CHECK_UTF8 is false.
             unsafe { std::str::from_utf8_unchecked(bytes) }
         };
+
+        let mut key = String::new();
+        key.try_reserve(bytes.len())
+            .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
         key.push_str(str);
+
         Ok(key)
     }
 }
@@ -629,7 +654,35 @@ mod tests {
         assert_path_parse(input, &expected);
 
         let input = r#"$."测\t试""#;
-        let expected = vec![Step::Root, Step::Object(ObjectStep::Key(r#"测\t试"#.to_string()))];
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("测\t试".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."测\n试""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("测\n试".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."测\"试""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("测\"试".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."测\\试""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("测\\试".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."测\r试""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("测\r试".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."\r测试""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\r测试".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."测试\r""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("测试\r".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."\r测\r试\r""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\r测\r试\r".to_string()))];
         assert_path_parse(input, &expected);
 
         let input = "$..key";
@@ -824,5 +877,9 @@ mod tests {
 
         let input = r#"$."nam\ae""#;
         assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 8);
+        let input = r#"$."\ynamae""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 5);
+        let input = r#"$."nama\e""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 9);
     }
 }

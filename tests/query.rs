@@ -230,6 +230,44 @@ fn test_query() {
     let path = r#"$[0][3 to last - 2]"#;
     let expected = r#""test""#;
     assert_query(input, path, Some(expected));
+
+    let input = r#"{"ke\by": 1, "ke\fy": 2, "ke\ny": 3, "ke\ry": 4, "ke\ty": 5, "ke\"y": 6, "ke\\y": 7, "ke\/y": 8}"#;
+
+    let path = r#"$."ke\by""#;
+    let expected = r#"1"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\fy""#;
+    let expected = r#"2"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\ny""#;
+    let expected = r#"3"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\ry""#;
+    let expected = r#"4"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\ty""#;
+    let expected = r#"5"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\"y""#;
+    let expected = r#"6"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\\y""#;
+    let expected = r#"7"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke\/y""#;
+    let expected = r#"8"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."ke/y""#;
+    let expected = r#"8"#;
+    assert_query(input, path, Some(expected));
 }
 
 #[test]
