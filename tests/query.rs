@@ -268,6 +268,36 @@ fn test_query() {
     let path = r#"$."ke/y""#;
     let expected = r#"8"#;
     assert_query(input, path, Some(expected));
+
+    let input = r#"{"\u0036": 1, "\ud7ff": 2, "\uf000": 3, "\uffff": 4, "\u000D": 5, "\f": 6}"#;
+
+    let path = r#"$."\u0036""#;
+    let expected = r#"1"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."\ud7ff""#;
+    let expected = r#"2"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."\uf000""#;
+    let expected = r#"3"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."\uffff""#;
+    let expected = r#"4"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."\u000D""#;
+    let expected = r#"5"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."\r""#;
+    let expected = r#"5"#;
+    assert_query(input, path, Some(expected));
+
+    let path = r#"$."\u000C""#;
+    let expected = r#"6"#;
+    assert_query(input, path, Some(expected));
 }
 
 #[test]

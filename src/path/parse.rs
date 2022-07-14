@@ -363,6 +363,7 @@ impl<'a> PathParser<'a> {
     fn parse_escape(&mut self, buf: &mut Vec<u8>) -> PathParseResult<()> {
         buf.try_reserve(1)
             .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+
         match self.pop() {
             Some(b'b') => buf.push(b'\x08'),
             Some(b'f') => buf.push(b'\x0c'),
@@ -372,11 +373,38 @@ impl<'a> PathParser<'a> {
             Some(b'"') => buf.push(b'"'),
             Some(b'/') => buf.push(b'/'),
             Some(b'\\') => buf.push(b'\\'),
+            Some(b'u') => {
+                let c = self.parse_unicode_escape()?;
+                buf.try_extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes())
+                    .map_err(|e| PathParseError::new(PathParseErrorKind::TryReserveError(e), self.pos))?;
+            }
+
             None => return Err(PathParseError::new(PathParseErrorKind::UnclosedQuotedStep, self.pos)),
             _ => return Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, self.pos)),
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn parse_unicode_escape(&mut self) -> PathParseResult<char> {
+        if self.pos + 4 > self.input.len() {
+            return Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, self.pos));
+        }
+
+        let start = self.pos;
+        let mut n = 0;
+        for _ in 0..4 {
+            let v = decode_hex_val(self.input[self.pos], start)?;
+            n = (n << 4) + v;
+            self.pos += 1;
+        }
+
+        // Surrogate characters(0xD800 - 0xDFFF) is checked in `from_u32()`.
+        let c = char::from_u32(n as u32)
+            .ok_or_else(|| PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, start))?;
+
+        Ok(c)
     }
 
     #[inline]
@@ -569,6 +597,41 @@ impl<'a> PathParser<'a> {
     }
 }
 
+const __: u8 = 255; // not a hex digit
+
+#[allow(clippy::zero_prefixed_literal)]
+static HEX: [u8; 256] = {
+    [
+        //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 0
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 1
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
+        00, 01, 02, 03, 04, 05, 06, 07, 08, 09, __, __, __, __, __, __, // 3
+        __, 10, 11, 12, 13, 14, 15, __, __, __, __, __, __, __, __, __, // 4
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 5
+        __, 10, 11, 12, 13, 14, 15, __, __, __, __, __, __, __, __, __, // 6
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
+        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
+    ]
+};
+
+#[inline]
+fn decode_hex_val(v: u8, start: usize) -> PathParseResult<u16> {
+    let n = HEX[v as usize];
+    if n != __ {
+        Ok(n as u16)
+    } else {
+        Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, start))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -683,6 +746,22 @@ mod tests {
 
         let input = r#"$."\r测\r试\r""#;
         let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\r测\r试\r".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."\u0010""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\u{0010}".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."\u0036""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\u{0036}".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."\uF000""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\u{f000}".to_string()))];
+        assert_path_parse(input, &expected);
+
+        let input = r#"$."\u000D""#;
+        let expected = vec![Step::Root, Step::Object(ObjectStep::Key("\r".to_string()))];
         assert_path_parse(input, &expected);
 
         let input = "$..key";
@@ -874,6 +953,8 @@ mod tests {
 
         let input = r#"$."nam"#;
         assert_path_parse_error(input, PathParseErrorKind::UnclosedQuotedStep, 6);
+        let input = r#"$."\u0035"#;
+        assert_path_parse_error(input, PathParseErrorKind::UnclosedQuotedStep, 9);
 
         let input = r#"$."nam\ae""#;
         assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 8);
@@ -881,5 +962,13 @@ mod tests {
         assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 5);
         let input = r#"$."nama\e""#;
         assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 9);
+        let input = r#"$."\uD800""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 5);
+        let input = r#"$."\u001""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 5);
+        let input = r#"$."\uDFFF""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 5);
+        let input = r#"$."\u003l""#;
+        assert_path_parse_error(input, PathParseErrorKind::InvalidEscapeSequence, 5);
     }
 }
