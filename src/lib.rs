@@ -191,10 +191,11 @@ mod yason;
 #[cfg(feature = "serde")]
 mod serde;
 
-pub use self::{
+pub use crate::{
     builder::{ArrayBuilder, ArrayRefBuilder, BuildError, NumberError, ObjectBuilder, ObjectRefBuilder, Scalar},
     data_type::{DataType, InvalidDataType},
     format::FormatError,
+    json::JsonParseError,
     path::{PathExpression, PathParseError, QueriedValue},
     yason::{Array, ArrayIter, KeyIter, Object, ObjectIter, Value, ValueIter, Yason, YasonBuf, YasonError},
 };

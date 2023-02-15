@@ -3,7 +3,7 @@
 use bencher::{benchmark_group, benchmark_main, black_box, Bencher};
 use std::cmp::Ordering;
 use std::str::FromStr;
-use yason::{Array, ArrayRefBuilder, Number, Object, ObjectRefBuilder, PathExpression, YasonBuf};
+use yason::{Array, ArrayRefBuilder, Number, Object, ObjectRefBuilder, PathExpression, Yason, YasonBuf};
 
 fn bench_push_string(bench: &mut Bencher) {
     let mut bytes = Vec::with_capacity(1024);
@@ -200,7 +200,7 @@ fn sort_init() -> (Vec<String>, Vec<u8>) {
 fn sort_test(keys: &[String], bytes: &mut Vec<u8>, key_sorted: bool) {
     bytes.clear();
     let mut builder = ObjectRefBuilder::try_new(bytes, KEYS_COUNT as u16, key_sorted).unwrap();
-    for key in keys.iter().take(KEYS_COUNT as usize) {
+    for key in keys.iter().take(KEYS_COUNT) {
         builder.push_null(key.as_str()).unwrap();
     }
     builder.finish().unwrap();
@@ -258,6 +258,24 @@ fn bench_format(bench: &mut Bencher) {
     bench.iter(|| format!("{}", yason.format(true)))
 }
 
+fn bench_parse_json_to_yasonbuf(bench: &mut Bencher) {
+    let input = r#"{"key1": 12345678910, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789e+10, "key3": {"key6": 123456789987654321}}, [123456789987654321.123456789987654321, false, null]], "key5": {"key1": true, "key2": 789e+100, "key3": null}}"#;
+
+    bench.iter(|| YasonBuf::parse(input))
+}
+
+fn bench_parse_json_to_yason(bench: &mut Bencher) {
+    let input = r#"{"key1": 12345678910, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789e+10, "key3": {"key6": 123456789987654321}}, [123456789987654321.123456789987654321, false, null]], "key5": {"key1": true, "key2": 789e+100, "key3": null}}"#;
+
+    let mut buf = String::new();
+    bench.iter(|| {
+        buf.clear();
+        unsafe {
+            Yason::parse_to(buf.as_mut_vec(), input).unwrap();
+        }
+    })
+}
+
 benchmark_group!(
     yason_benches,
     bench_push_string,
@@ -282,6 +300,8 @@ benchmark_group!(
     bench_query,
     bench_path_parse,
     bench_format,
+    bench_parse_json_to_yasonbuf,
+    bench_parse_json_to_yason,
 );
 
 benchmark_main!(yason_benches);

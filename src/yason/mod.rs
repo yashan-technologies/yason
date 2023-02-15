@@ -64,7 +64,7 @@ impl Error for YasonError {}
 pub type YasonResult<T> = std::result::Result<T, YasonError>;
 
 /// An owned `Yason` value, backed by a buffer of bytes in yason binary format.
-/// This can be created from a Vec<u8>.
+/// This can be created from a `Vec<u8>`.
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct YasonBuf {

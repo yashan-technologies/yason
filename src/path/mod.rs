@@ -56,7 +56,7 @@ impl<'a> AsMut<Vec<Value<'a>>> for QueryBuf<'a, '_> {
     fn as_mut(&mut self) -> &mut Vec<Value<'a>> {
         match self {
             QueryBuf::Owned(buf) => buf,
-            QueryBuf::Borrowed(buf) => *buf,
+            QueryBuf::Borrowed(buf) => buf,
         }
     }
 }
@@ -66,7 +66,7 @@ impl<'a> AsRef<[Value<'a>]> for QueryBuf<'a, '_> {
     fn as_ref(&self) -> &[Value<'a>] {
         match self {
             QueryBuf::Owned(buf) => buf,
-            QueryBuf::Borrowed(buf) => *buf,
+            QueryBuf::Borrowed(buf) => buf,
         }
     }
 }

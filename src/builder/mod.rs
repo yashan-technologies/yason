@@ -8,6 +8,7 @@ pub use array::{ArrBuilder, ArrayBuilder, ArrayRefBuilder};
 pub use object::{ObjBuilder, ObjectBuilder, ObjectRefBuilder};
 pub use scalar::Scalar;
 
+use crate::json;
 use std::collections::TryReserveError;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -41,8 +42,8 @@ pub enum BuildError {
     InnerUncompletedError,
     InconsistentElementCount { expected: u16, actual: u16 },
     StringTooLong(usize),
-    JsonError(serde_json::Error),
     NumberError(NumberError),
+    JsonParseError(json::JsonParseError),
     NestedTooDeeply,
 }
 
@@ -58,8 +59,8 @@ impl Display for BuildError {
                 expected, actual
             ),
             BuildError::StringTooLong(e) => write!(f, "string too long, length is {}", e),
-            BuildError::JsonError(e) => write!(f, "{}", e),
             BuildError::NumberError(e) => write!(f, "{}", e),
+            BuildError::JsonParseError(e) => write!(f, "{}", e),
             BuildError::NestedTooDeeply => write!(f, "nested too many depth"),
         }
     }
@@ -91,7 +92,7 @@ impl<'a> Depth<'a> {
     fn borrow_mut(&mut self) -> Depth<'_> {
         match self {
             Depth::Owned(d) => Depth::Borrowed(d),
-            Depth::Borrowed(d) => Depth::Borrowed(*d),
+            Depth::Borrowed(d) => Depth::Borrowed(d),
         }
     }
 

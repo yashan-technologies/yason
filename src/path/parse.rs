@@ -1,7 +1,7 @@
 //! Path Parser.
 
 use crate::vec::VecExt;
-use crate::PathExpression;
+use crate::{util, PathExpression};
 use std::collections::TryReserveError;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -25,7 +25,7 @@ const COUNT: &[u8] = b"count";
 const SIZE: &[u8] = b"size";
 const TYPE: &[u8] = b"type";
 
-/// This type represents error that can arise during parsing path expression.
+/// This type represents error that can be raised during parsing path expression.
 #[derive(Debug)]
 pub struct PathParseError {
     kind: PathParseErrorKind,
@@ -87,7 +87,7 @@ impl Error for PathParseError {}
 
 pub type PathParseResult<T> = std::result::Result<T, PathParseError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SingleIndex {
     /// \[1]
     Index(usize),
@@ -95,7 +95,7 @@ pub enum SingleIndex {
     Last(usize),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SingleStep {
     /// \[1] \ [last - 1]
     Single(SingleIndex),
@@ -103,7 +103,7 @@ pub enum SingleStep {
     Range(SingleIndex, SingleIndex),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ArrayStep {
     /// \[1]
     Index(usize),
@@ -117,7 +117,7 @@ pub enum ArrayStep {
     Wildcard,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ObjectStep {
     /// .key
     Key(String),
@@ -125,14 +125,14 @@ pub enum ObjectStep {
     Wildcard,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum FuncStep {
     Count,
     Size,
     Type,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Step {
     /// $
     Root,
@@ -597,38 +597,11 @@ impl<'a> PathParser<'a> {
     }
 }
 
-const __: u8 = 255; // not a hex digit
-
-#[allow(clippy::zero_prefixed_literal)]
-static HEX: [u8; 256] = {
-    [
-        //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 0
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 1
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
-        00, 01, 02, 03, 04, 05, 06, 07, 08, 09, __, __, __, __, __, __, // 3
-        __, 10, 11, 12, 13, 14, 15, __, __, __, __, __, __, __, __, __, // 4
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 5
-        __, 10, 11, 12, 13, 14, 15, __, __, __, __, __, __, __, __, __, // 6
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
-        __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
-    ]
-};
-
 #[inline]
 fn decode_hex_val(v: u8, start: usize) -> PathParseResult<u16> {
-    let n = HEX[v as usize];
-    if n != __ {
-        Ok(n as u16)
-    } else {
-        Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, start))
+    match util::decode_hex_val(v) {
+        Some(n) => Ok(n as u16),
+        None => Err(PathParseError::new(PathParseErrorKind::InvalidEscapeSequence, start)),
     }
 }
 
