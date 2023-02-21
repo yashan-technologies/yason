@@ -28,18 +28,9 @@ impl<'a> SliceRead<'a> {
     }
 
     #[inline]
-    pub fn peek(&mut self) -> Option<u8> {
+    pub fn peek(&self) -> Option<u8> {
         if self.index < self.slice.len() {
             Some(self.slice[self.index])
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn get(&mut self, index: usize) -> Option<u8> {
-        if index < self.slice.len() {
-            Some(self.slice[index])
         } else {
             None
         }
@@ -76,6 +67,19 @@ impl<'a> SliceRead<'a> {
         Position {
             line: self.line,
             column: self.column,
+        }
+    }
+
+    #[inline]
+    pub fn peek_position(&self) -> Position {
+        let mut step = 0;
+        if self.index < self.slice.len() {
+            step = 1;
+        }
+
+        Position {
+            line: self.line,
+            column: self.column + step,
         }
     }
 

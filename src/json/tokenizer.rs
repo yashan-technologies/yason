@@ -38,10 +38,19 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn step(&mut self) -> Result<u8> {
-        match self.source.next() {
-            Some(b) => Ok(b),
-            None => Err(self.error(ErrorCode::EofWhileParsingString)),
-        }
+        self.source
+            .next()
+            .ok_or_else(|| self.error(ErrorCode::EofWhileParsingString))
+    }
+
+    #[inline]
+    fn peek(&self) -> Option<u8> {
+        self.source.peek()
+    }
+
+    #[inline]
+    fn advance(&mut self) {
+        self.source.advance()
     }
 
     #[inline]
@@ -216,118 +225,105 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn read_number(&mut self, begin: u8) -> Result<Token<'a>> {
-        let mut have_sign = false;
-        let mut start_with_zero = false;
+    fn read_number(&mut self, mut begin: u8) -> Result<Token<'a>> {
         let start = self.source.index() - 1;
 
         if begin == b'-' {
-            have_sign = true;
+            begin = self.step()?;
         }
-        if begin == b'0' {
-            start_with_zero = true;
-        }
-
-        while let Some(ch) = self.source.peek() {
-            match ch {
-                b'0' => {
-                    if start_with_zero {
-                        return Err(self.error(ErrorCode::InvalidNumber));
+        match begin {
+            b'0' => match self.peek() {
+                // There can be only one leading '0'.
+                Some(b'0'..=b'9') => Err(self.peek_error(ErrorCode::InvalidNumber)),
+                _ => self.read_decimal(start),
+            },
+            b'1'..=b'9' => loop {
+                match self.peek() {
+                    Some(b'0'..=b'9') => self.advance(),
+                    _ => {
+                        return self.read_decimal(start);
                     }
-                    self.source.advance();
                 }
-                b'1'..=b'9' => {
-                    self.source.advance();
-                }
-                b'.' => {
-                    self.source.advance();
-                    return self.read_decimal(start);
-                }
-                b'e' | b'E' => {
-                    self.source.advance();
-                    return self.read_exponent(start);
-                }
-                _ => break,
-            }
+            },
+            _ => Err(self.error(ErrorCode::InvalidNumber)),
         }
-
-        let end = self.source.index();
-
-        if have_sign && end == start + 1 {
-            return Err(self.error(ErrorCode::InvalidNumber));
-        }
-
-        // number
-        Ok(Token::Number(self.get_number_from_interval(start, end)?))
     }
 
     #[inline]
     fn read_decimal(&mut self, start: usize) -> Result<Token<'a>> {
-        // if there is exponent next to decimal point, we return failed
-        let mut next_to_decimal_point = true;
+        match self.peek() {
+            Some(b'.') => self.read_fraction(start),
+            Some(b'e' | b'E') => self.read_exponent(start),
+            _ => Ok(Token::Number(
+                self.get_number_from_interval(start, self.source.index())?,
+            )),
+        }
+    }
 
-        while let Some(ch) = self.source.peek() {
-            match ch {
-                b'0'..=b'9' => {
-                    self.source.advance();
-                    next_to_decimal_point = false;
+    #[inline]
+    fn read_fraction(&mut self, start: usize) -> Result<Token<'a>> {
+        self.advance();
+
+        // if there is exponent next to decimal point, we return failed
+        match self.peek() {
+            Some(b'0'..=b'9') => {
+                self.advance();
+                while let Some(b'0'..=b'9') = self.peek() {
+                    self.advance();
                 }
-                b'e' | b'E' => {
-                    if next_to_decimal_point {
-                        return Err(self.error(ErrorCode::InvalidNumber));
-                    }
-                    self.source.advance();
-                    return self.read_exponent(start);
-                }
-                _ => {
-                    break;
-                }
+            }
+            Some(_) => {
+                return Err(self.error(ErrorCode::InvalidNumber));
+            }
+            None => {
+                return Err(self.peek_error(ErrorCode::EofWhileParsingValue));
             }
         }
 
-        let end = self.source.index();
-
-        // if there is nothing next to decimal point, we return failed
-        if self.source.get(end - 1) == Some(b'.') {
-            return Err(self.error(ErrorCode::InvalidNumber));
+        match self.peek() {
+            Some(b'e' | b'E') => self.read_exponent(start),
+            _ => Ok(Token::Number(
+                self.get_number_from_interval(start, self.source.index())?,
+            )),
         }
-
-        Ok(Token::Number(self.get_number_from_interval(start, end)?))
     }
 
     #[inline]
     fn read_exponent(&mut self, start: usize) -> Result<Token<'a>> {
-        // if there is not sign(+,-) next to exponent, we return failed
-        let mut next_to_exponent = true;
-        let mut dealt_with_sign = false;
+        self.advance();
 
-        while let Some(ch) = self.source.peek() {
-            match ch {
-                b'0'..=b'9' => {
-                    self.source.advance();
-                    next_to_exponent = false;
-                }
-                b'+' | b'-' => {
-                    if dealt_with_sign && !next_to_exponent {
-                        return Err(self.error(ErrorCode::InvalidNumber));
-                    }
-                    self.source.advance();
-                    dealt_with_sign = true;
-                }
-                _ => {
-                    break;
-                }
+        // read - or +, 0..9 do nothing
+        match self.peek() {
+            Some(b'+' | b'-') => {
+                self.advance();
+            }
+            Some(b'0'..=b'9') => {}
+            Some(_) => {
+                return Err(self.error(ErrorCode::InvalidNumber));
+            }
+            None => {
+                return Err(self.peek_error(ErrorCode::EofWhileParsingValue));
             }
         }
 
-        let end = self.source.index();
-
-        // if there is nothing next to e, we will return invalid number error
-        if self.source.get(end - 1) == Some(b'e') || self.source.get(end - 1) == Some(b'E') {
-            return Err(self.error(ErrorCode::InvalidNumber));
+        match self.peek() {
+            Some(b'0'..=b'9') => {
+                self.advance();
+                while let Some(b'0'..=b'9') = self.peek() {
+                    self.advance();
+                }
+            }
+            Some(_) => {
+                return Err(self.error(ErrorCode::InvalidNumber));
+            }
+            None => {
+                return Err(self.peek_error(ErrorCode::EofWhileParsingValue));
+            }
         }
 
-        Ok(Token::Number(self.get_number_from_interval(start, end)?))
+        Ok(Token::Number(
+            self.get_number_from_interval(start, self.source.index())?,
+        ))
     }
 
     #[inline]
@@ -344,6 +340,12 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     pub fn error(&self, reason: ErrorCode) -> JsonParseError {
         let position = self.source.position();
+        JsonParseError::new(reason, position.line, position.column)
+    }
+
+    #[inline]
+    fn peek_error(&self, reason: ErrorCode) -> JsonParseError {
+        let position = self.source.peek_position();
         JsonParseError::new(reason, position.line, position.column)
     }
 

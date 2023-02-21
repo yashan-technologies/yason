@@ -193,6 +193,12 @@ mod test {
         assert!(array.get(3).unwrap().as_bool().unwrap());
         assert!(!array.get(4).unwrap().as_bool().unwrap());
 
+        let v = from_str(r#"["中国人", "Би Хятадын байна"]"#).unwrap();
+        let array = v.as_array().unwrap();
+
+        assert_eq!("中国人", array.get(0).unwrap().as_str().unwrap());
+        assert_eq!("Би Хятадын байна", array.get(1).unwrap().as_str().unwrap());
+
         let v = from_str(r#"[123, "1234", null, true, false,]"#);
         assert_eq!(ErrorCode::ExpectedSomeValue, v.err().unwrap().errcode());
 
@@ -250,6 +256,9 @@ mod test {
         let number: Value = from_str(r#"1e23"#).unwrap();
         assert_eq!("1e23".to_string(), number.as_number().unwrap());
 
+        let number: Value = from_str(r#"0"#).unwrap();
+        assert_eq!("0".to_string(), number.as_number().unwrap());
+
         let number = from_str(r#"1234-"#);
         assert_eq!(ErrorCode::TrailingCharacters, number.err().unwrap().errcode());
 
@@ -257,15 +266,30 @@ mod test {
         assert_eq!(ErrorCode::ExpectedSomeValue, number.err().unwrap().errcode());
 
         let number = from_str(r#"1234."#);
-        assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
+        assert_eq!(ErrorCode::EofWhileParsingValue, number.err().unwrap().errcode());
 
         let number = from_str(r#"1234e"#);
-        assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
+        assert_eq!(ErrorCode::EofWhileParsingValue, number.err().unwrap().errcode());
 
         let number = from_str(r#"1234.e11"#);
         assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
 
         let number = from_str(r#"1234.1e"#);
+        assert_eq!(ErrorCode::EofWhileParsingValue, number.err().unwrap().errcode());
+
+        let number = from_str(r#"01234"#);
+        assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
+
+        let number = from_str(r#"-01234"#);
+        assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
+
+        let number = from_str(r#"-012.34"#);
+        assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
+
+        let number = from_str(r#"-.1234"#);
+        assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
+
+        let number = from_str(r#"-000000001"#);
         assert_eq!(ErrorCode::InvalidNumber, number.err().unwrap().errcode());
     }
 
@@ -276,6 +300,21 @@ mod test {
 
         let str: Value = from_str(r#""abc\uD800\uDC00\uD800\uDC00\b\f\n\n\t\\\/""#).unwrap();
         assert_eq!("abc𐀀𐀀\u{8}\u{c}\n\n\t\\/", str.as_str().unwrap());
+    }
+
+    #[test]
+    fn test_parse_utf8_string() {
+        let str: Value = from_str(r#""中国人""#).unwrap();
+        assert_eq!("中国人", str.as_str().unwrap());
+
+        let str: Value = from_str(r#""Би Хятадын байна""#).unwrap();
+        assert_eq!("Би Хятадын байна", str.as_str().unwrap());
+
+        let str: Value = from_str(r#""ちゅうごくじん""#).unwrap();
+        assert_eq!("ちゅうごくじん", str.as_str().unwrap());
+
+        let str: Value = from_str(r#""??????""#).unwrap();
+        assert_eq!("??????", str.as_str().unwrap());
     }
 
     #[test]
