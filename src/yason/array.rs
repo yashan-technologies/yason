@@ -1,6 +1,6 @@
 //! Array manipulation.
 
-use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, OBJECT_SIZE, VALUE_ENTRY_SIZE};
+use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, VALUE_ENTRY_SIZE};
 use crate::yason::object::Object;
 use crate::yason::{LazyValue, Value, Yason, YasonError, YasonResult};
 use crate::{DataType, Number};
@@ -188,25 +188,15 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
-    fn read_size(&self, value_pos: usize) -> YasonResult<i32> {
-        let size_pos = value_pos + DATA_TYPE_SIZE;
-        self.0.read_i32(size_pos)
-    }
-
-    #[inline]
     pub(crate) fn read_object(&self, value_entry_pos: usize) -> YasonResult<Object<'a>> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
-        let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
-        let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
-        Ok(unsafe { Object::new_unchecked(yason) })
+        self.0.read_object(value_pos)
     }
 
     #[inline]
     pub(crate) fn read_array(&self, value_entry_pos: usize) -> YasonResult<Array<'a>> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
-        let size = self.read_size(value_pos)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
-        let yason = unsafe { Yason::new_unchecked(self.0.slice(value_pos, value_pos + size)?) };
-        Ok(unsafe { Array::new_unchecked(yason) })
+        self.0.read_array(value_pos)
     }
 
     #[inline]
