@@ -138,9 +138,20 @@ pub fn decode_varint(buf: &[u8], index: usize) -> YasonResult<(u32, usize)> {
     unreachable!("data length read error");
 }
 
+#[inline]
+pub fn slice_to_array<T, const N: usize>(s: &[T]) -> [T; N]
+where
+    [T; N]: Copy,
+{
+    debug_assert_eq!(s.len(), N);
+    let ptr = s.as_ptr() as *const [T; N];
+    unsafe { *ptr }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::util::{decode_varint, encode_varint};
+    use crate::util::{decode_varint, encode_varint, slice_to_array};
+    use std::fmt::Debug;
 
     fn assert_varint(value: u32, expected: &[u8]) {
         let mut buf = Vec::with_capacity(4);
@@ -158,5 +169,21 @@ mod tests {
         assert_varint(500, &[244, 3]);
         assert_varint(20000, &[160, 156, 1]);
         assert_varint(250000000, &[128, 229, 154, 119]);
+    }
+
+    #[test]
+    fn test_slice_to_array() {
+        fn assert_slice_to_array<T, const N: usize>(val: [T; N])
+        where
+            T: PartialEq + Debug,
+            [T; N]: Copy,
+        {
+            let s = &val[..];
+            let a = slice_to_array::<T, N>(s);
+            assert_eq!(s, a);
+        }
+
+        assert_slice_to_array([1_i8, 2, 3, 4]);
+        assert_slice_to_array([1_i32, 2, 3, 4]);
     }
 }

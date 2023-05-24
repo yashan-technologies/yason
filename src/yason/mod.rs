@@ -8,7 +8,7 @@ pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 
 use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE, OBJECT_SIZE};
 use crate::format::{CompactFormatter, FormatResult, Formatter, LazyFormat, PrettyFormatter};
-use crate::util::decode_varint;
+use crate::util::{decode_varint, slice_to_array};
 use crate::{BuildError, DataType, Number, Scalar};
 use std::borrow::Borrow;
 use std::collections::TryReserveError;
@@ -312,8 +312,7 @@ impl Yason {
     fn read_i32(&self, index: usize) -> YasonResult<i32> {
         let end = index + size_of::<i32>();
         let bytes = self.slice(index, end)?;
-        // SAFETY: The `bytes` must be valid because the `slice()` always takes 4 bytes.
-        Ok(i32::from_le_bytes(bytes.try_into().unwrap()))
+        Ok(i32::from_le_bytes(slice_to_array(bytes)))
     }
 
     #[inline]
@@ -325,16 +324,14 @@ impl Yason {
     fn read_u16(&self, index: usize) -> YasonResult<u16> {
         let end = index + size_of::<u16>();
         let bytes = self.slice(index, end)?;
-        // SAFETY: The `bytes` must be valid because the `slice()` always takes 2 bytes.
-        Ok(u16::from_le_bytes(bytes.try_into().unwrap()))
+        Ok(u16::from_le_bytes(slice_to_array(bytes)))
     }
 
     #[inline]
     fn read_u32(&self, index: usize) -> YasonResult<u32> {
         let end = index + size_of::<u32>();
         let bytes = self.slice(index, end)?;
-        // SAFETY: The `bytes` must be valid because the `slice()` always takes 4 bytes.
-        Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+        Ok(u32::from_le_bytes(slice_to_array(bytes)))
     }
 
     #[inline]
