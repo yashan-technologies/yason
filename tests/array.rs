@@ -10,6 +10,14 @@ fn assert_string<T: AsRef<str>>(input: Value, expected: T) {
     };
 }
 
+fn assert_binary<T: AsRef<[u8]>>(input: Value, expected: T) {
+    if let Value::Binary(value) = input {
+        assert_eq!(value, expected.as_ref());
+    } else {
+        panic!("type inconsistency");
+    };
+}
+
 fn assert_number(input: Value, expected: Number) {
     if let Value::Number(value) = input {
         assert_eq!(value, expected);
@@ -43,7 +51,7 @@ macro_rules! assert_value_eq {
 
 fn assert_array(yason: &Yason) {
     let array = yason.array().unwrap();
-    assert_eq!(array.len().unwrap(), 12);
+    assert_eq!(array.len().unwrap(), 13);
     assert!(!array.is_empty().unwrap());
     assert_eq!(array.type_of(0).unwrap(), DataType::Number);
     assert!(array.is_type(1, DataType::String).unwrap());
@@ -59,12 +67,13 @@ fn assert_array(yason: &Yason) {
     assert_value_eq!(Bigint, array.get(7).unwrap(), 12345678_i64);
     assert_value_eq!(Float, array.get(8).unwrap(), 123.456_f32);
     assert_value_eq!(Double, array.get(9).unwrap(), 12.3456789_f64);
-    assert_eq!(array.get(10).unwrap().data_type(), DataType::Array);
-    assert_eq!(array.get(11).unwrap().data_type(), DataType::Object);
+    assert_binary(array.get(10).unwrap(), b"abc");
+    assert_eq!(array.get(11).unwrap().data_type(), DataType::Array);
+    assert_eq!(array.get(12).unwrap().data_type(), DataType::Object);
 
     assert!(array.bool(0).is_err());
 
-    let value = array.get(12);
+    let value = array.get(13);
     assert!(value.is_err());
 
     // tests iter
@@ -91,14 +100,17 @@ fn assert_array(yason: &Yason) {
         } else if id == 9 {
             assert_value_eq!(Double, value, 12.3456789_f64);
         } else if id == 10 {
-            assert_eq!(value.data_type(), DataType::Array);
+            assert_binary(value, b"abc");
         } else if id == 11 {
+            assert_eq!(value.data_type(), DataType::Array);
+        } else if id == 12 {
             assert_eq!(value.data_type(), DataType::Object);
         }
     }
 
-    assert_eq!(array.object(11).unwrap().string("key").unwrap().unwrap(), "value");
-    assert!(array.array(10).unwrap().bool(0).unwrap());
+    assert_eq!(array.object(12).unwrap().string("key").unwrap().unwrap(), "value");
+    assert!(array.array(11).unwrap().bool(0).unwrap());
+    assert_eq!(array.binary(10).unwrap(), b"abc");
     assert_eq!(array.double(9).unwrap(), 12.3456789_f64);
     assert_eq!(array.float(8).unwrap(), 123.456_f32);
     assert_eq!(array.bigint(7).unwrap(), 12345678_i64);
@@ -111,8 +123,7 @@ fn assert_array(yason: &Yason) {
 }
 
 fn create_yason() -> YasonBuf {
-    // [123, "abc", null, false, [true], {key: value}]
-    let mut builder = ArrayBuilder::try_new(12).unwrap();
+    let mut builder = ArrayBuilder::try_new(13).unwrap();
     builder.push_number(Number::from(123)).unwrap();
     builder.push_string("abc").unwrap();
     builder.push_null().unwrap();
@@ -123,6 +134,7 @@ fn create_yason() -> YasonBuf {
     builder.push_bigint(12345678_i64).unwrap();
     builder.push_float(123.456_f32).unwrap();
     builder.push_double(12.3456789_f64).unwrap();
+    builder.push_binary(b"abc").unwrap();
 
     let mut array_builder = builder.push_array(1).unwrap();
     array_builder.push_bool(true).unwrap();
@@ -136,8 +148,7 @@ fn create_yason() -> YasonBuf {
 }
 
 fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
-    // [123, "abc", null, false, [true], {key: value}]
-    let mut builder = ArrayRefBuilder::try_new(bytes, 12).unwrap();
+    let mut builder = ArrayRefBuilder::try_new(bytes, 13).unwrap();
     builder.push_number(Number::from(123)).unwrap();
     builder.push_string("abc").unwrap();
     builder.push_null().unwrap();
@@ -148,6 +159,7 @@ fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
     builder.push_bigint(12345678_i64).unwrap();
     builder.push_float(123.456_f32).unwrap();
     builder.push_double(12.3456789_f64).unwrap();
+    builder.push_binary(b"abc").unwrap();
 
     let mut array_builder = builder.push_array(1).unwrap();
     array_builder.push_bool(true).unwrap();

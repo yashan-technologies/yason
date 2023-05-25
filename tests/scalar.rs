@@ -218,3 +218,24 @@ fn test_double() {
     let n = yason.double().unwrap();
     assert_eq!(n, i);
 }
+
+#[test]
+fn test_binary() {
+    let yason = Scalar::binary(b"abc").unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Binary);
+    let binary = yason.binary().unwrap();
+    assert_eq!(binary, b"abc");
+
+    // test from vec
+    let mut bytes: Vec<u8> = Vec::with_capacity(128);
+    let yason = Scalar::binary_with_vec(b"abc", &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Binary);
+    let binary = yason.binary().unwrap();
+    assert_eq!(binary, b"abc");
+
+    // test from used vec
+    let yason = Scalar::binary_with_vec(b"abc", &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Binary);
+    let binary = yason.binary().unwrap();
+    assert_eq!(binary, b"abc");
+}

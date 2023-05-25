@@ -205,6 +205,19 @@ impl Yason {
         self.read_string(0)
     }
 
+    /// If `Yason` is `Binary`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn binary(&self) -> YasonResult<&[u8]> {
+        self.check_type(0, DataType::Binary)?;
+        unsafe { self.binary_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn binary_unchecked(&self) -> YasonResult<&[u8]> {
+        debug_assert!(self.data_type()? == DataType::Binary);
+        self.read_binary(0)
+    }
+
     /// If `Yason` is `Number`, return its value. Returns `YasonError` otherwise.
     #[inline]
     pub fn number(&self) -> YasonResult<Number> {
@@ -473,6 +486,15 @@ impl Yason {
     }
 
     #[inline]
+    fn read_binary(&self, index: usize) -> YasonResult<&[u8]> {
+        let index = index + DATA_TYPE_SIZE;
+        let (data_length, data_length_len) = decode_varint(&self.bytes, index)?;
+        let end = index + data_length_len + data_length as usize;
+        let bytes = self.slice(index + data_length_len, end)?;
+        Ok(bytes)
+    }
+
+    #[inline]
     fn read_number(&self, index: usize) -> YasonResult<Number> {
         let index = index + DATA_TYPE_SIZE;
         let data_length = self.get(index)? as usize;
@@ -530,6 +552,7 @@ pub enum Value<'a> {
     Bigint(i64),
     Float(f32),
     Double(f64),
+    Binary(&'a [u8]),
 }
 
 impl<'a> Value<'a> {
@@ -548,6 +571,7 @@ impl<'a> Value<'a> {
             Value::Bigint(_) => DataType::Bigint,
             Value::Float(_) => DataType::Float,
             Value::Double(_) => DataType::Double,
+            Value::Binary(_) => DataType::Binary,
         }
     }
 
@@ -566,6 +590,7 @@ impl<'a> Value<'a> {
             Value::Bigint(i) => Ok(Scalar::bigint_with_vec(*i, buf)?),
             Value::Float(f) => Ok(Scalar::float_with_vec(*f, buf)?),
             Value::Double(f) => Ok(Scalar::double_with_vec(*f, buf)?),
+            Value::Binary(bin) => Ok(Scalar::binary_with_vec(bin, buf)?),
         }
     }
 
@@ -618,6 +643,9 @@ impl<'a> Value<'a> {
                 let mut fmt = CompactFormatter::new(extended);
                 fmt.write_double(*f, writer)
             }
+            Value::Binary(bin) => {
+                format_to!(writer, pretty, extended, bin, write_binary)
+            }
         }
     }
 }
@@ -640,6 +668,7 @@ impl<'a> TryFrom<&'a Yason> for Value<'a> {
             DataType::Bigint => Ok(Value::Bigint(unsafe { yason.bigint_unchecked()? })),
             DataType::Float => Ok(Value::Float(unsafe { yason.float_unchecked()? })),
             DataType::Double => Ok(Value::Double(unsafe { yason.double_unchecked()? })),
+            DataType::Binary => Ok(Value::Binary(unsafe { yason.binary_unchecked()? })),
         }
     }
 }
@@ -682,6 +711,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
                 DataType::Bigint => Value::Bigint(self.bigint()?),
                 DataType::Float => Value::Float(self.float()?),
                 DataType::Double => Value::Double(self.double()?),
+                DataType::Binary => Value::Binary(self.binary()?),
             }
         };
 
@@ -715,6 +745,16 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
             Array::new_unchecked(self.yason).read_string(self.value_pos)
         } else {
             self.yason.read_string(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn binary(&self) -> YasonResult<&'a [u8]> {
+        debug_assert!(self.ty == DataType::Binary);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_binary(self.value_pos)
+        } else {
+            self.yason.read_binary(self.value_pos)
         }
     }
 
@@ -817,6 +857,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
             DataType::Bigint => unsafe { Ok(self.bigint()?.eq(&other.bigint()?)) },
             DataType::Float => unsafe { Ok(self.float()?.eq(&other.float()?)) },
             DataType::Double => unsafe { Ok(self.double()?.eq(&other.double()?)) },
+            DataType::Binary => unsafe { Ok(self.binary()?.eq(other.binary()?)) },
         }
     }
 }

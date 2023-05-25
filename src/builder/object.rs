@@ -214,6 +214,17 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
     }
 
     #[inline]
+    fn push_binary(&mut self, key: &str, value: &[u8]) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + MAX_DATA_LENGTH_SIZE + value.len();
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Binary);
+            bytes.push_binary(value)?;
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
     fn push_number(&mut self, key: &str, value: &Number) -> BuildResult<()> {
         let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + NUMBER_LENGTH_SIZE + MAX_BINARY_SIZE;
         let f = |bytes: &mut Vec<u8>| {
@@ -371,6 +382,9 @@ pub trait ObjBuilder {
     /// Pushes a string value.
     fn push_string<Key: AsRef<str>, Val: AsRef<str>>(&mut self, key: Key, value: Val) -> BuildResult<&mut Self>;
 
+    /// Pushes a binary value.
+    fn push_binary<Key: AsRef<str>, Val: AsRef<[u8]>>(&mut self, key: Key, value: Val) -> BuildResult<&mut Self>;
+
     /// Pushes a number value.
     fn push_number<Key: AsRef<str>, Num: AsRef<Number>>(&mut self, key: Key, value: Num) -> BuildResult<&mut Self>;
 
@@ -432,6 +446,19 @@ macro_rules! impl_push_methods {
             let key = key.as_ref();
             let value = value.as_ref();
             self.0.push_string(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a binary value.
+        #[inline]
+        $v fn push_binary<Key: AsRef<str>, Val: AsRef<[u8]>>(
+            &mut self,
+            key: Key,
+            value: Val,
+        ) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            let value = value.as_ref();
+            self.0.push_binary(key, value)?;
             Ok(self)
         }
 

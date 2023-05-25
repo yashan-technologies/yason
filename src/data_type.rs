@@ -19,11 +19,12 @@ pub enum DataType {
     Bigint = 10,
     Float = 11,
     Double = 12,
+    Binary = 13,
 }
 
-const DATA_TYPE_NAME: [&str; 13] = [
+const DATA_TYPE_NAME: [&str; 14] = [
     "invalid", "object", "array", "string", "number", "boolean", "null", "tinyint", "smallint", "integer", "bigint",
-    "float", "double",
+    "float", "double", "binary",
 ];
 
 impl DataType {
@@ -56,6 +57,7 @@ impl Display for DataType {
             DataType::Bigint => write!(f, "Bigint"),
             DataType::Float => write!(f, "Float"),
             DataType::Double => write!(f, "Double"),
+            DataType::Binary => write!(f, "Binary"),
         }
     }
 }
@@ -83,6 +85,7 @@ impl TryFrom<u8> for DataType {
             10 => Ok(DataType::Bigint),
             11 => Ok(DataType::Float),
             12 => Ok(DataType::Double),
+            13 => Ok(DataType::Binary),
             v => Err(InvalidDataType(v)),
         }
     }

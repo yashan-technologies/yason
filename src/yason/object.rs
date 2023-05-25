@@ -160,6 +160,18 @@ impl<'a> Object<'a> {
         Ok(None)
     }
 
+    /// Gets a binary value for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn binary<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<&'a [u8]>> {
+        let found = self.check_key(key.as_ref(), DataType::Binary)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_binary(value_pos)?));
+        }
+        Ok(None)
+    }
+
     /// Gets a number value for this key if it exists and has the correct type, returns `None`
     /// if this key does not exist, returns `YasonError` otherwise.
     #[inline]
@@ -319,6 +331,7 @@ impl<'a> Object<'a> {
             DataType::Bigint => Value::Bigint(self.0.read_bigint(value_pos)?),
             DataType::Float => Value::Float(self.0.read_float(value_pos)?),
             DataType::Double => Value::Double(self.0.read_double(value_pos)?),
+            DataType::Binary => Value::Binary(self.0.read_binary(value_pos)?),
         };
         Ok(value)
     }

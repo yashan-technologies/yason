@@ -65,6 +65,10 @@ fn assert_eq(left: &Value, right: &Value) {
             (Value::Double(l), Value::Double(r)) => assert_eq!(l, r),
             _ => unreachable!(),
         },
+        DataType::Binary => match (left, right) {
+            (Value::Binary(l), Value::Binary(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
     }
 }
 

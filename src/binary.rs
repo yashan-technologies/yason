@@ -13,6 +13,7 @@ pub const VALUE_ENTRY_SIZE: usize = DATA_TYPE_SIZE + size_of::<u32>();
 pub const KEY_LENGTH_SIZE: usize = size_of::<u16>();
 pub const MAX_DATA_LENGTH_SIZE: usize = size_of::<u32>();
 pub const MAX_STRING_SIZE: usize = 268435455; // 2^28 - 1
+pub const MAX_BINARY_SIZE: usize = MAX_STRING_SIZE;
 pub const NUMBER_LENGTH_SIZE: usize = size_of::<u8>();
 pub const TINYINT_SIZE: usize = size_of::<i8>();
 pub const SMALLINT_SIZE: usize = size_of::<i16>();

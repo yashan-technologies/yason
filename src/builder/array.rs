@@ -135,6 +135,19 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
+    fn push_binary(&mut self, value: &[u8]) -> BuildResult<()> {
+        let size = DATA_TYPE_SIZE + MAX_DATA_LENGTH_SIZE + value.len();
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Binary);
+            bytes.push_binary(value)?;
+            Ok(())
+        };
+        self.push_value(DataType::Binary, f)
+    }
+
+    #[inline]
     fn push_number(&mut self, value: &Number) -> BuildResult<()> {
         let size = DATA_TYPE_SIZE + MAX_BINARY_SIZE + NUMBER_LENGTH_SIZE;
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
@@ -303,6 +316,9 @@ pub trait ArrBuilder {
     /// Pushes a string value.
     fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self>;
 
+    /// Pushes a binary value.
+    fn push_binary<Val: AsRef<[u8]>>(&mut self, value: Val) -> BuildResult<&mut Self>;
+
     /// Pushes a number value.
     fn push_number<Num: AsRef<Number>>(&mut self, value: Num) -> BuildResult<&mut Self>;
 
@@ -352,6 +368,14 @@ macro_rules! impl_push_methods {
         $v fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self> {
             let value = value.as_ref();
             self.0.push_string(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a binary value.
+        #[inline]
+        $v fn push_binary<Val: AsRef<[u8]>>(&mut self, value: Val) -> BuildResult<&mut Self> {
+            let value = value.as_ref();
+            self.0.push_binary(value)?;
             Ok(self)
         }
 

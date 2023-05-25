@@ -180,6 +180,7 @@
 
 #[macro_use]
 mod format;
+mod base64;
 mod binary;
 mod builder;
 mod data_type;

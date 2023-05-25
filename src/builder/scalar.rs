@@ -35,6 +35,26 @@ impl Scalar {
         Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
     }
 
+    /// Encodes a binary value.
+    #[inline]
+    pub fn binary<T: AsRef<[u8]>>(s: T) -> BuildResult<YasonBuf> {
+        let mut bytes = Vec::new();
+        Scalar::binary_with_vec(s, &mut bytes)?;
+        Ok(unsafe { YasonBuf::new_unchecked(bytes) })
+    }
+
+    /// Encodes a binary value into the provided vector.
+    #[inline]
+    pub fn binary_with_vec<T: AsRef<[u8]>>(s: T, bytes: &mut Vec<u8>) -> BuildResult<&Yason> {
+        let init_len = bytes.len();
+        let s = s.as_ref();
+        let size = DATA_TYPE_SIZE + MAX_DATA_LENGTH_SIZE + s.len();
+        bytes.try_reserve(size)?;
+        bytes.push_data_type(DataType::Binary);
+        bytes.push_binary(s)?;
+        Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
+    }
+
     /// Encodes a number value.
     #[inline]
     pub fn number<Num: AsRef<Number>>(value: Num) -> BuildResult<YasonBuf> {

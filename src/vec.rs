@@ -4,7 +4,6 @@ use crate::binary::{KEY_OFFSET_SIZE, MAX_STRING_SIZE, NUMBER_LENGTH_SIZE, OBJECT
 use crate::builder::BuildResult;
 use crate::util::encode_varint;
 use crate::{BuildError, DataType, Number};
-use decimal_rs::MAX_BINARY_SIZE;
 use std::collections::TryReserveError;
 use std::mem::size_of;
 
@@ -27,9 +26,11 @@ pub trait VecExt: Sized {
     fn write_total_size(&mut self, size: i32, size_pos: usize);
     fn write_offset(&mut self, offset: u32, offset_pos: usize);
     fn push_bytes(&mut self, bytes: &[u8]);
-    fn push_data_length(&mut self, length: usize) -> BuildResult<()>;
     fn push_key(&mut self, s: &str);
+    fn push_string_length(&mut self, length: usize) -> BuildResult<()>;
     fn push_string(&mut self, s: &str) -> BuildResult<()>;
+    fn push_binary_length(&mut self, length: usize) -> BuildResult<()>;
+    fn push_binary(&mut self, s: &[u8]) -> BuildResult<()>;
     fn push_number(&mut self, value: &Number);
     fn try_extend_from_slice(&mut self, other: &[u8]) -> Result<(), TryReserveError>;
     fn try_push(&mut self, val: u8) -> Result<(), TryReserveError>;
@@ -156,7 +157,13 @@ impl VecExt for Vec<u8> {
     }
 
     #[inline]
-    fn push_data_length(&mut self, length: usize) -> BuildResult<()> {
+    fn push_key(&mut self, s: &str) {
+        self.push_u16(s.len() as u16);
+        self.push_str(s);
+    }
+
+    #[inline]
+    fn push_string_length(&mut self, length: usize) -> BuildResult<()> {
         if length > MAX_STRING_SIZE {
             return Err(BuildError::StringTooLong(length));
         }
@@ -165,20 +172,31 @@ impl VecExt for Vec<u8> {
     }
 
     #[inline]
-    fn push_key(&mut self, s: &str) {
-        self.push_u16(s.len() as u16);
-        self.push_str(s);
-    }
-
-    #[inline]
     fn push_string(&mut self, s: &str) -> BuildResult<()> {
-        self.push_data_length(s.len())?;
+        self.push_string_length(s.len())?;
         self.push_str(s);
         Ok(())
     }
 
     #[inline]
+    fn push_binary_length(&mut self, length: usize) -> BuildResult<()> {
+        if length > crate::binary::MAX_BINARY_SIZE {
+            return Err(BuildError::BinaryTooLong(length));
+        }
+        encode_varint(length as u32, self);
+        Ok(())
+    }
+
+    #[inline]
+    fn push_binary(&mut self, s: &[u8]) -> BuildResult<()> {
+        self.push_binary_length(s.len())?;
+        self.push_bytes(s);
+        Ok(())
+    }
+
+    #[inline]
     fn push_number(&mut self, value: &Number) {
+        use decimal_rs::MAX_BINARY_SIZE;
         let length_pos = self.len();
         let value_pos = length_pos + NUMBER_LENGTH_SIZE;
         let new_len = value_pos + MAX_BINARY_SIZE;

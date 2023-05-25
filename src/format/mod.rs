@@ -1,8 +1,10 @@
 //! Formatter.
 
 use crate::extended::{
-    BIGINT_EXTENDED_NAME, FLOAT_EXTENDED_NAME, MAX_SAFE_BIGINT, MIN_SAFE_BIGINT, NUMBER_EXTENDED_NAME,
+    BIGINT_EXTENDED_NAME, BINARY_EXTENDED_NAME, FLOAT_EXTENDED_NAME, MAX_SAFE_BIGINT, MIN_SAFE_BIGINT,
+    NUMBER_EXTENDED_NAME,
 };
+use crate::vec::VecExt;
 use crate::yason::LazyValue;
 use crate::{Array, DataType, Number, Object, Value, Yason, YasonError};
 use decimal_rs::DecimalFormatError;
@@ -111,6 +113,10 @@ pub trait Formatter {
                 let f = unsafe { value.double()? };
                 self.write_double(f, writer)
             }
+            DataType::Binary => {
+                let binary = unsafe { value.binary()? };
+                self.write_binary(binary, writer)
+            }
         }
     }
 
@@ -207,6 +213,22 @@ pub trait Formatter {
         self.begin_string(writer)?;
         format_escaped_str(value, writer)?;
         self.end_string(writer)
+    }
+
+    #[inline]
+    fn write_binary<W: fmt::Write>(&mut self, value: &[u8], writer: &mut W) -> FormatResult<()> {
+        if self.extended() {
+            self.write_extended_object(writer, BINARY_EXTENDED_NAME, |w| {
+                w.write_bytes(b"\"")?;
+                format_binary_to_base64(value, w)?;
+                w.write_bytes(b"\"")?;
+                Ok(())
+            })
+        } else {
+            self.begin_string(writer)?;
+            format_binary_to_hex(value, writer)?;
+            self.end_string(writer)
+        }
     }
 
     #[inline]
@@ -394,6 +416,7 @@ pub trait Formatter {
             Value::Bigint(i) => self.write_bigint(*i, writer),
             Value::Float(f) => self.write_float(*f, writer),
             Value::Double(f) => self.write_double(*f, writer),
+            Value::Binary(bin) => self.write_binary(bin, writer),
         }?;
 
         self.end_array_value(writer)
@@ -533,6 +556,31 @@ fn format_escaped_str<W: fmt::Write>(value: &str, writer: &mut W) -> FormatResul
         writer.write_bytes(&bytes[start..])?;
     }
 
+    Ok(())
+}
+
+#[inline]
+fn format_binary_to_hex<W: fmt::Write>(value: &[u8], writer: &mut W) -> FormatResult<()> {
+    const HEX_BYTES: &[u8; 16] = b"0123456789ABCDEF";
+
+    for &b in value {
+        let (first, second) = (HEX_BYTES[(b >> 4) as usize], HEX_BYTES[(b & 0x0F) as usize]);
+        writer.write_bytes(&[first, second])?;
+    }
+
+    Ok(())
+}
+
+#[inline]
+fn format_binary_to_base64<W: fmt::Write>(value: &[u8], writer: &mut W) -> FormatResult<()> {
+    use crate::base64::*;
+
+    let encoded_len = encoded_len(value.len());
+    let mut buf = Vec::try_with_capacity(encoded_len).map_err(YasonError::TryReserveError)?;
+    unsafe { buf.set_len(encoded_len) };
+    let len = encode(value, &mut buf[..]);
+    debug_assert_eq!(encoded_len, len);
+    writer.write_bytes(&buf[..len])?;
     Ok(())
 }
 

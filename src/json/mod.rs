@@ -9,7 +9,8 @@ mod value;
 pub use error::JsonParseError;
 
 use crate::builder::{ArrBuilder, BuildResult, NumberError, ObjBuilder};
-use crate::extended::EXTENDED_NAME_TYPES;
+use crate::extended::{BINARY_BASE64_NAME, BINARY_SUBTYPE_NAME, EXTENDED_NAME_TYPES};
+use crate::vec::VecExt;
 use crate::{ArrayRefBuilder, BuildError, DataType, Number, ObjectRefBuilder, Scalar, Yason, YasonBuf};
 use decimal_rs::DecimalParseError;
 use error::Result;
@@ -196,7 +197,7 @@ fn write_object<T: ObjBuilder>(builder: &mut T, object: &Map<Cow<str>, Value>, e
 fn write_extended_object_as_scalar(bytes: &mut Vec<u8>, object: &Map<Cow<str>, Value>) -> BuildResult<bool> {
     debug_assert_eq!(object.len(), 1);
 
-    macro_rules! create_scalar {
+    macro_rules! create_numeric_scalar {
         ($value: expr, $bytes: expr, $ty: ty, $method: ident) => {
             match $value {
                 Value::String(str) => {
@@ -227,25 +228,32 @@ fn write_extended_object_as_scalar(bytes: &mut Vec<u8>, object: &Map<Cow<str>, V
             DataType::Bool => unreachable!(),
             DataType::Null => unreachable!(),
             DataType::Number => {
-                create_scalar!(value, bytes, Number, number_with_vec);
+                create_numeric_scalar!(value, bytes, Number, number_with_vec);
             }
             DataType::Tinyint => {
-                create_scalar!(value, bytes, i8, tinyint_with_vec);
+                create_numeric_scalar!(value, bytes, i8, tinyint_with_vec);
             }
             DataType::Smallint => {
-                create_scalar!(value, bytes, i16, smallint_with_vec);
+                create_numeric_scalar!(value, bytes, i16, smallint_with_vec);
             }
             DataType::Integer => {
-                create_scalar!(value, bytes, i32, integer_with_vec);
+                create_numeric_scalar!(value, bytes, i32, integer_with_vec);
             }
             DataType::Bigint => {
-                create_scalar!(value, bytes, i64, bigint_with_vec);
+                create_numeric_scalar!(value, bytes, i64, bigint_with_vec);
             }
             DataType::Float => {
-                create_scalar!(value, bytes, f32, float_with_vec);
+                create_numeric_scalar!(value, bytes, f32, float_with_vec);
             }
             DataType::Double => {
-                create_scalar!(value, bytes, f64, double_with_vec);
+                create_numeric_scalar!(value, bytes, f64, double_with_vec);
+            }
+            DataType::Binary => {
+                let ret = decode_binary(value, |bin| {
+                    let _ = Scalar::binary_with_vec(bin, bytes)?;
+                    Ok(())
+                })?;
+                return Ok(ret);
             }
         }
     }
@@ -311,6 +319,13 @@ fn write_extended_object_to_object<T: ObjBuilder>(
             DataType::Double => {
                 push_extended_numeric!(key, value, builder, f64, push_double);
             }
+            DataType::Binary => {
+                let ret = decode_binary(value, |bin| {
+                    builder.push_binary(key, bin)?;
+                    Ok(())
+                })?;
+                return Ok(ret);
+            }
         }
     }
 
@@ -371,10 +386,74 @@ fn write_extended_object_to_array<T: ArrBuilder>(builder: &mut T, object: &Map<C
             DataType::Double => {
                 push_extended_numeric!(value, builder, f64, push_double);
             }
+            DataType::Binary => {
+                let ret = decode_binary(value, |bin| {
+                    builder.push_binary(bin)?;
+                    Ok(())
+                })?;
+                return Ok(ret);
+            }
         }
     }
 
     Ok(false)
+}
+
+#[inline]
+fn decode_binary<F>(value: &Value, f: F) -> BuildResult<bool>
+where
+    F: for<'a> FnOnce(&'a [u8]) -> BuildResult<()>,
+{
+    match value {
+        Value::String(str) => {
+            if decode_base64(str, f)? {
+                return Ok(true);
+            }
+        }
+        Value::Object(obj) => {
+            if obj.len() == 2 && obj_has_valid_subtype(obj) {
+                if let Some(Value::String(str)) = obj.get(BINARY_BASE64_NAME) {
+                    if decode_base64(str, f)? {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        _ => (), // ignore other types
+    }
+
+    Ok(false)
+}
+
+#[inline]
+fn decode_base64<F>(value: &str, f: F) -> BuildResult<bool>
+where
+    F: FnOnce(&[u8]) -> BuildResult<()>,
+{
+    use crate::base64::*;
+
+    let decoded_len = decoded_len_estimate(value.len());
+    let mut buf = Vec::try_with_capacity(decoded_len)?;
+    unsafe { buf.set_len(decoded_len) };
+    if let Ok(len) = decode(value.as_bytes(), &mut buf[..]) {
+        f(&buf[..len])?;
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+#[inline]
+fn obj_has_valid_subtype(obj: &Map<Cow<str>, Value>) -> bool {
+    if let Some(Value::Number(str)) = obj.get(BINARY_SUBTYPE_NAME) {
+        if let Ok(n) = number2decimal(str) {
+            if !n.has_fract() && u8::try_from(n).is_ok() {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 #[inline]

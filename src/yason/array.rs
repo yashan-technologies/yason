@@ -123,6 +123,15 @@ impl<'a> Array<'a> {
         self.read_string(value_entry_pos)
     }
 
+    /// Gets a binary value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn binary(&self, index: usize) -> YasonResult<&'a [u8]> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Binary)?;
+        self.read_binary(value_entry_pos)
+    }
+
     /// Gets a number value if the element at the given index has the correct type, returns `YasonError` otherwise.
     #[inline]
     pub fn number(&self, index: usize) -> YasonResult<Number> {
@@ -260,6 +269,12 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
+    pub(crate) fn read_binary(&self, value_entry_pos: usize) -> YasonResult<&'a [u8]> {
+        let value_pos = self.read_value_pos(value_entry_pos)?;
+        self.0.read_binary(value_pos)
+    }
+
+    #[inline]
     pub(crate) fn read_number(&self, value_entry_pos: usize) -> YasonResult<Number> {
         let value_pos = self.read_value_pos(value_entry_pos)?;
         self.0.read_number(value_pos)
@@ -324,6 +339,7 @@ impl<'a> Array<'a> {
             DataType::Bigint => Value::Bigint(self.read_bigint(value_entry_pos)?),
             DataType::Float => Value::Float(self.read_float(value_entry_pos)?),
             DataType::Double => Value::Double(self.read_double(value_entry_pos)?),
+            DataType::Binary => Value::Binary(self.read_binary(value_entry_pos)?),
         };
         Ok(value)
     }

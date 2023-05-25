@@ -42,6 +42,7 @@ pub enum BuildError {
     InnerUncompletedError,
     InconsistentElementCount { expected: u16, actual: u16 },
     StringTooLong(usize),
+    BinaryTooLong(usize),
     NumberError(NumberError),
     JsonParseError(json::JsonParseError),
     NestedTooDeeply,
@@ -59,6 +60,7 @@ impl Display for BuildError {
                 expected, actual
             ),
             BuildError::StringTooLong(e) => write!(f, "string too long, length is {}", e),
+            BuildError::BinaryTooLong(e) => write!(f, "binary too long, length is {}", e),
             BuildError::NumberError(e) => write!(f, "{}", e),
             BuildError::JsonParseError(e) => write!(f, "{}", e),
             BuildError::NestedTooDeeply => write!(f, "nested too many depth"),

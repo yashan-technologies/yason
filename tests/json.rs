@@ -47,6 +47,10 @@ fn assert_scalar_inner(input: &str, expected: &str, expected_type: DataType, ext
             assert_eq!(yason.data_type().unwrap(), DataType::Double);
             assert_eq!(yason.double().unwrap(), f64::from_str(expected).unwrap());
         }
+        DataType::Binary => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Binary);
+            assert_eq!(yason.binary().unwrap(), expected.as_bytes());
+        }
         DataType::Object => unreachable!(),
         DataType::Array => unreachable!(),
     }
@@ -104,6 +108,13 @@ fn test_scalar() {
     assert_scalar_extended(r#"{"$numberDouble": "-infinity"}"#, "-infinity", DataType::Double);
     assert_scalar_extended(r#"{"$numberFloat": "inf"}"#, "Inf", DataType::Float);
     assert_scalar_extended(r#"{"$numberFloat": "-infinity"}"#, "-infinity", DataType::Float);
+
+    assert_scalar_extended(r#"{"$binary": "aGVsbG8h"}"#, "hello!", DataType::Binary);
+    assert_scalar_extended(
+        r#"{"$binary": {"base64": "SmF2YVNjcmlwdA==", "subType": 0}}"#,
+        "JavaScript",
+        DataType::Binary,
+    );
 }
 
 enum TestValue {
@@ -184,6 +195,7 @@ fn assert_value(value: Value, expected: &mut TestValue) {
         Value::Bigint(i) => assert_eq!(i, i64::from_str(expected.scalar()).unwrap()),
         Value::Float(f) => assert_eq!(f, f32::from_str(expected.scalar()).unwrap()),
         Value::Double(f) => assert_eq!(f, f64::from_str(expected.scalar()).unwrap()),
+        Value::Binary(bin) => assert_eq!(bin, expected.scalar().as_bytes()),
     }
 }
 
@@ -282,7 +294,8 @@ fn test_extended_array() {
         {"$numberLong": 123456789},
         {"$numberDecimal": "123.456789"},
         {"$numberFloat": "123.456"},
-        {"$numberDouble": "12.3456789"}
+        {"$numberDouble": "12.3456789"},
+        {"$binary": "aGVsbG8h"}
     ]"#;
     let expected = vec![
         TestValue::Scalar((DataType::Tinyint, "123".to_string())),
@@ -292,6 +305,7 @@ fn test_extended_array() {
         TestValue::Scalar((DataType::Number, "123.456789".to_string())),
         TestValue::Scalar((DataType::Float, "123.456".to_string())),
         TestValue::Scalar((DataType::Double, "12.3456789".to_string())),
+        TestValue::Scalar((DataType::Binary, "hello!".to_string())),
     ];
 
     let yason = YasonBuf::parse(input, true).unwrap();
@@ -308,7 +322,8 @@ fn test_extended_object() {
         "bigint": {"$numberLong": 123456789},
         "number": {"$numberDecimal": "123.456789"},
         "float": {"$numberFloat": "123.456"},
-        "double": {"$numberDouble": "12.3456789"}
+        "double": {"$numberDouble": "12.3456789"},
+        "binary": {"$binary": "aGVsbG8h"}
     }"#;
     let expected = vec![
         (
@@ -338,6 +353,10 @@ fn test_extended_object() {
         (
             "double".to_string(),
             TestValue::Scalar((DataType::Double, "12.3456789".to_string())),
+        ),
+        (
+            "binary".to_string(),
+            TestValue::Scalar((DataType::Binary, "hello!".to_string())),
         ),
     ];
 
