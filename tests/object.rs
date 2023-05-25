@@ -31,9 +31,19 @@ fn assert_null(input: Value) {
     assert!(res);
 }
 
+macro_rules! assert_value_eq {
+    ($ty: ident, $input: expr, $expected: expr) => {
+        if let Value::$ty(value) = $input {
+            assert_eq!(value, $expected);
+        } else {
+            panic!("type inconsistency");
+        };
+    };
+}
+
 fn assert_object(yason: &Yason) {
     let object = yason.object().unwrap();
-    assert_eq!(object.len().unwrap(), 6);
+    assert_eq!(object.len().unwrap(), 12);
     assert!(!object.is_empty().unwrap());
     assert_eq!(object.type_of("id").unwrap().unwrap(), DataType::Number);
     assert!(object.is_type("name", DataType::String).unwrap().unwrap());
@@ -43,6 +53,12 @@ fn assert_object(yason: &Yason) {
     assert_string(object.get("name").unwrap().unwrap(), "abc");
     assert_bool(object.get("child").unwrap().unwrap(), false);
     assert_null(object.get("phone").unwrap().unwrap());
+    assert_value_eq!(Tinyint, object.get("tinyint").unwrap().unwrap(), 123_i8);
+    assert_value_eq!(Smallint, object.get("smallint").unwrap().unwrap(), 12345_i16);
+    assert_value_eq!(Integer, object.get("integer").unwrap().unwrap(), 1234567_i32);
+    assert_value_eq!(Bigint, object.get("bigint").unwrap().unwrap(), 12345678_i64);
+    assert_value_eq!(Float, object.get("float").unwrap().unwrap(), 123.456_f32);
+    assert_value_eq!(Double, object.get("double").unwrap().unwrap(), 12.3456789_f64);
     assert_eq!(object.get("array").unwrap().unwrap().data_type(), DataType::Array);
     assert_eq!(object.get("object").unwrap().unwrap().data_type(), DataType::Object);
 
@@ -50,6 +66,12 @@ fn assert_object(yason: &Yason) {
     assert_eq!(object.string("name").unwrap().unwrap(), "abc");
     assert!(!object.bool("child").unwrap().unwrap());
     assert!(object.is_null("phone").unwrap().unwrap());
+    assert_eq!(object.tinyint("tinyint").unwrap().unwrap(), 123_i8);
+    assert_eq!(object.smallint("smallint").unwrap().unwrap(), 12345_i16);
+    assert_eq!(object.integer("integer").unwrap().unwrap(), 1234567_i32);
+    assert_eq!(object.bigint("bigint").unwrap().unwrap(), 12345678_i64);
+    assert_eq!(object.float("float").unwrap().unwrap(), 123.456_f32);
+    assert_eq!(object.double("double").unwrap().unwrap(), 12.3456789_f64);
     assert_eq!(object.array("array").unwrap().unwrap().len().unwrap(), 1);
     assert_eq!(object.object("object").unwrap().unwrap().len().unwrap(), 1);
 
@@ -74,11 +96,31 @@ fn assert_object(yason: &Yason) {
             assert_eq!(key, "child");
             assert_bool(value, false);
         } else if id == 4 {
+            assert_eq!(key, "float");
+            assert_value_eq!(Float, value, 123.456_f32);
+        } else if id == 5 {
             assert_eq!(key, "phone");
             assert_null(value);
-        } else if id == 5 {
+        } else if id == 6 {
+            assert_eq!(key, "bigint");
+            assert_value_eq!(Bigint, value, 12345678_i64);
+        } else if id == 7 {
+            assert_eq!(key, "double");
+            assert_value_eq!(Double, value, 12.3456789_f64);
+        } else if id == 8 {
             assert_eq!(key, "object");
             assert_eq!(value.data_type(), DataType::Object);
+        } else if id == 9 {
+            assert_eq!(key, "integer");
+            assert_value_eq!(Integer, value, 1234567_i32);
+        } else if id == 10 {
+            assert_eq!(key, "tinyint");
+            assert_value_eq!(Tinyint, value, 123_i8);
+        } else if id == 11 {
+            assert_eq!(key, "smallint");
+            assert_value_eq!(Smallint, value, 12345_i16);
+        } else {
+            panic!();
         }
     }
 
@@ -94,9 +136,23 @@ fn assert_object(yason: &Yason) {
         } else if id == 3 {
             assert_eq!(key, "child");
         } else if id == 4 {
-            assert_eq!(key, "phone");
+            assert_eq!(key, "float");
         } else if id == 5 {
+            assert_eq!(key, "phone");
+        } else if id == 6 {
+            assert_eq!(key, "bigint");
+        } else if id == 7 {
+            assert_eq!(key, "double");
+        } else if id == 8 {
             assert_eq!(key, "object");
+        } else if id == 9 {
+            assert_eq!(key, "integer");
+        } else if id == 10 {
+            assert_eq!(key, "tinyint");
+        } else if id == 11 {
+            assert_eq!(key, "smallint");
+        } else {
+            panic!();
         }
     }
 
@@ -112,20 +168,40 @@ fn assert_object(yason: &Yason) {
         } else if id == 3 {
             assert_bool(value, false);
         } else if id == 4 {
-            assert_null(value);
+            assert_value_eq!(Float, value, 123.456_f32);
         } else if id == 5 {
+            assert_null(value);
+        } else if id == 6 {
+            assert_value_eq!(Bigint, value, 12345678_i64);
+        } else if id == 7 {
+            assert_value_eq!(Double, value, 12.3456789_f64);
+        } else if id == 8 {
             assert_eq!(value.data_type(), DataType::Object);
+        } else if id == 9 {
+            assert_value_eq!(Integer, value, 1234567_i32);
+        } else if id == 10 {
+            assert_value_eq!(Tinyint, value, 123_i8);
+        } else if id == 11 {
+            assert_value_eq!(Smallint, value, 12345_i16);
+        } else {
+            panic!();
         }
     }
 }
 
 fn create_yason() -> YasonBuf {
     // {"id": 1, "name": "abc", "child": false, "phone": null, "array": [true], "object": {"key": true} }}
-    let mut builder = ObjectBuilder::try_new(6, false).unwrap();
+    let mut builder = ObjectBuilder::try_new(12, false).unwrap();
     builder.push_number("id", Number::from(1)).unwrap();
     builder.push_string("name", "abc").unwrap();
     builder.push_bool("child", false).unwrap();
     builder.push_null("phone").unwrap();
+    builder.push_tinyint("tinyint", 123_i8).unwrap();
+    builder.push_smallint("smallint", 12345_i16).unwrap();
+    builder.push_integer("integer", 1234567_i32).unwrap();
+    builder.push_bigint("bigint", 12345678_i64).unwrap();
+    builder.push_float("float", 123.456_f32).unwrap();
+    builder.push_double("double", 12.3456789_f64).unwrap();
 
     let mut array_builder = builder.push_array("array", 1).unwrap();
     array_builder.push_bool(true).unwrap();
@@ -139,11 +215,17 @@ fn create_yason() -> YasonBuf {
 }
 
 fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
-    let mut builder = ObjectRefBuilder::try_new(bytes, 6, false).unwrap();
+    let mut builder = ObjectRefBuilder::try_new(bytes, 12, false).unwrap();
     builder.push_number("id", Number::from(1)).unwrap();
     builder.push_string("name", "abc").unwrap();
     builder.push_bool("child", false).unwrap();
     builder.push_null("phone").unwrap();
+    builder.push_tinyint("tinyint", 123_i8).unwrap();
+    builder.push_smallint("smallint", 12345_i16).unwrap();
+    builder.push_integer("integer", 1234567_i32).unwrap();
+    builder.push_bigint("bigint", 12345678_i64).unwrap();
+    builder.push_float("float", 123.456_f32).unwrap();
+    builder.push_double("double", 12.3456789_f64).unwrap();
 
     let mut array_builder = builder.push_array("array", 1).unwrap();
     array_builder.push_bool(true).unwrap();

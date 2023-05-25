@@ -1,8 +1,8 @@
 //! Object builder.
 
 use crate::binary::{
-    BOOL_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, KEY_LENGTH_SIZE, KEY_OFFSET_SIZE, MAX_DATA_LENGTH_SIZE,
-    NUMBER_LENGTH_SIZE, OBJECT_SIZE,
+    BIGINT_SIZE, BOOL_SIZE, DATA_TYPE_SIZE, DOUBLE_SIZE, ELEMENT_COUNT_SIZE, FLOAT_SIZE, INTEGER_SIZE, KEY_LENGTH_SIZE,
+    KEY_OFFSET_SIZE, MAX_DATA_LENGTH_SIZE, NUMBER_LENGTH_SIZE, OBJECT_SIZE, SMALLINT_SIZE, TINYINT_SIZE,
 };
 use crate::builder::array::{ArrayRefBuilder, InnerArrayBuilder};
 use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
@@ -244,6 +244,72 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
         };
         self.push_key_value_by(key, size, f)
     }
+
+    #[inline]
+    fn push_tinyint(&mut self, key: &str, value: i8) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + TINYINT_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Tinyint);
+            bytes.push_i8(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_smallint(&mut self, key: &str, value: i16) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + SMALLINT_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Smallint);
+            bytes.push_i16(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_integer(&mut self, key: &str, value: i32) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + INTEGER_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Integer);
+            bytes.push_i32(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_bigint(&mut self, key: &str, value: i64) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + BIGINT_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Bigint);
+            bytes.push_i64(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_float(&mut self, key: &str, value: f32) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + FLOAT_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Float);
+            bytes.push_f32(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_double(&mut self, key: &str, value: f64) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + DOUBLE_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Double);
+            bytes.push_f64(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
 }
 
 /// Builder for encoding an object.
@@ -313,6 +379,24 @@ pub trait ObjBuilder {
 
     /// Pushes a null value.
     fn push_null<Key: AsRef<str>>(&mut self, key: Key) -> BuildResult<&mut Self>;
+
+    /// Pushes a tinyint value.
+    fn push_tinyint<Key: AsRef<str>>(&mut self, key: Key, value: i8) -> BuildResult<&mut Self>;
+
+    /// Pushes a smallint value.
+    fn push_smallint<Key: AsRef<str>>(&mut self, key: Key, value: i16) -> BuildResult<&mut Self>;
+
+    /// Pushes a integer value.
+    fn push_integer<Key: AsRef<str>>(&mut self, key: Key, value: i32) -> BuildResult<&mut Self>;
+
+    /// Pushes a bigint value.
+    fn push_bigint<Key: AsRef<str>>(&mut self, key: Key, value: i64) -> BuildResult<&mut Self>;
+
+    /// Pushes a float value.
+    fn push_float<Key: AsRef<str>>(&mut self, key: Key, value: f32) -> BuildResult<&mut Self>;
+
+    /// Pushes a double value.
+    fn push_double<Key: AsRef<str>>(&mut self, key: Key, value: f64) -> BuildResult<&mut Self>;
 }
 
 macro_rules! impl_push_methods {
@@ -372,6 +456,54 @@ macro_rules! impl_push_methods {
         $v fn push_null<Key: AsRef<str>>(&mut self, key: Key) -> BuildResult<&mut Self> {
             let key = key.as_ref();
             self.0.push_null(key)?;
+            Ok(self)
+        }
+
+        /// Pushes a tinyint value.
+        #[inline]
+        $v fn push_tinyint<Key: AsRef<str>>(&mut self, key: Key, value: i8) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_tinyint(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a smallint value.
+        #[inline]
+        $v fn push_smallint<Key: AsRef<str>>(&mut self, key: Key, value: i16) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_smallint(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a integer value.
+        #[inline]
+        $v fn push_integer<Key: AsRef<str>>(&mut self, key: Key, value: i32) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_integer(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a bigint value.
+        #[inline]
+        $v fn push_bigint<Key: AsRef<str>>(&mut self, key: Key, value: i64) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_bigint(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a float value.
+        #[inline]
+        $v fn push_float<Key: AsRef<str>>(&mut self, key: Key, value: f32) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_float(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a double value.
+        #[inline]
+        $v fn push_double<Key: AsRef<str>>(&mut self, key: Key, value: f64) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_double(key, value)?;
             Ok(self)
         }
     };

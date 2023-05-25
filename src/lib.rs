@@ -178,10 +178,12 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[macro_use]
+mod format;
 mod binary;
 mod builder;
 mod data_type;
-mod format;
+mod extended;
 mod json;
 mod path;
 mod util;

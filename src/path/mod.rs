@@ -35,13 +35,13 @@ pub enum QueriedValue<'a, 'b> {
 impl<'a, 'b> QueriedValue<'a, 'b> {
     /// Formats the value as a compact or pretty string.
     #[inline]
-    pub fn format_to<W: fmt::Write>(&self, pretty: bool, writer: &mut W) -> FormatResult<()> {
+    pub fn format_to<W: fmt::Write>(&self, pretty: bool, extended: bool, writer: &mut W) -> FormatResult<()> {
         match self {
             QueriedValue::None => Ok(()),
-            QueriedValue::Value(value) => value.format_to(pretty, writer),
-            QueriedValue::Values(values) => values_format_to(values, pretty, writer),
-            QueriedValue::ValuesRef(values) => values_format_to(values, pretty, writer),
-            QueriedValue::Yason(yason) => yason.format_to(pretty, writer),
+            QueriedValue::Value(value) => value.format_to(pretty, extended, writer),
+            QueriedValue::Values(values) => values_format_to(values, pretty, extended, writer),
+            QueriedValue::ValuesRef(values) => values_format_to(values, pretty, extended, writer),
+            QueriedValue::Yason(yason) => yason.format_to(pretty, extended, writer),
         }
     }
 }
@@ -206,6 +206,12 @@ fn values_to_yason<'a>(values: &[Value], bytes: &'a mut Vec<u8>) -> YasonResult<
             Value::Number(number) => builder.push_number(number)?,
             Value::Bool(bool) => builder.push_bool(*bool)?,
             Value::Null => builder.push_null()?,
+            Value::Tinyint(i) => builder.push_tinyint(*i)?,
+            Value::Smallint(i) => builder.push_smallint(*i)?,
+            Value::Integer(i) => builder.push_integer(*i)?,
+            Value::Bigint(i) => builder.push_bigint(*i)?,
+            Value::Float(f) => builder.push_float(*f)?,
+            Value::Double(f) => builder.push_double(*f)?,
         };
     }
 
@@ -213,16 +219,16 @@ fn values_to_yason<'a>(values: &[Value], bytes: &'a mut Vec<u8>) -> YasonResult<
 }
 
 #[inline]
-fn values_format_to<W: fmt::Write>(values: &[Value], pretty: bool, writer: &mut W) -> FormatResult<()> {
+fn values_format_to<W: fmt::Write>(values: &[Value], pretty: bool, extended: bool, writer: &mut W) -> FormatResult<()> {
     if values.is_empty() {
         return Ok(());
     }
 
     if pretty {
-        let mut fmt = PrettyFormatter::new();
+        let mut fmt = PrettyFormatter::new(extended);
         unsafe { fmt.write_values(values, writer) }
     } else {
-        let mut fmt = CompactFormatter::new();
+        let mut fmt = CompactFormatter::new(extended);
         unsafe { fmt.write_values(values, writer) }
     }
 }

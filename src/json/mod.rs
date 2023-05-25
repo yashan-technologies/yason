@@ -9,12 +9,12 @@ mod value;
 pub use error::JsonParseError;
 
 use crate::builder::{ArrBuilder, BuildResult, NumberError, ObjBuilder};
-use crate::{
-    ArrayBuilder, ArrayRefBuilder, BuildError, Number, ObjectBuilder, ObjectRefBuilder, Scalar, Yason, YasonBuf,
-};
+use crate::extended::EXTENDED_NAME_TYPES;
+use crate::{ArrayRefBuilder, BuildError, DataType, Number, ObjectRefBuilder, Scalar, Yason, YasonBuf};
 use decimal_rs::DecimalParseError;
 use error::Result;
 use std::borrow::Cow;
+use std::str::FromStr;
 use value::{Map, Value};
 
 #[inline]
@@ -23,57 +23,62 @@ fn from_str(s: &str) -> Result<Value> {
     parser.parse_str()
 }
 
-impl<'a> TryFrom<&Value<'a>> for YasonBuf {
-    type Error = BuildError;
-
-    #[inline]
-    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
-        match value {
-            Value::Null => Scalar::null(),
-            Value::Bool(val) => Scalar::bool(*val),
-            Value::Number(val) => Scalar::number(number2decimal(val)?),
-            Value::String(val) => Scalar::string(val),
-            Value::Array(val) => {
-                let mut array_builder = ArrayBuilder::try_new(val.len() as u16)?;
-                write_array(&mut array_builder, val)?;
-                array_builder.finish()
-            }
-            Value::Object(val) => {
-                let mut object_builder = ObjectBuilder::try_new(val.len() as u16, false)?;
-                write_object(&mut object_builder, val)?;
-                object_builder.finish()
-            }
-        }
-    }
-}
-
 impl YasonBuf {
     /// Parses a json string to `YasonBuf`.
     #[inline]
-    pub fn parse<T: AsRef<str>>(str: T) -> BuildResult<Self> {
-        let json = from_str(str.as_ref()).map_err(BuildError::JsonParseError)?;
-        YasonBuf::try_from(&json)
+    pub fn parse<T: AsRef<str>>(str: T, extended: bool) -> BuildResult<Self> {
+        let mut bytes = Vec::new();
+        Yason::parse_to(&mut bytes, str, extended)?;
+        Ok(unsafe { YasonBuf::new_unchecked(bytes) })
     }
 }
 
 impl Yason {
     /// Parses a json string to `Yason`.
     #[inline]
-    pub fn parse_to<T: AsRef<str>>(bytes: &mut Vec<u8>, str: T) -> BuildResult<&Yason> {
+    pub fn parse_to<T: AsRef<str>>(bytes: &mut Vec<u8>, str: T, extended: bool) -> BuildResult<&Yason> {
         let json = from_str(str.as_ref()).map_err(BuildError::JsonParseError)?;
         match &json {
             Value::Null => Scalar::null_with_vec(bytes),
             Value::Bool(val) => Scalar::bool_with_vec(*val, bytes),
-            Value::Number(val) => Scalar::number_with_vec(number2decimal(val)?, bytes),
+            Value::Number(val) => {
+                let decimal = number2decimal(val)?;
+                if extended {
+                    if decimal.has_fract() {
+                        Scalar::double_with_vec(f64::from(decimal), bytes)
+                    } else if let Ok(i) = i64::try_from(decimal) {
+                        if i >= i8::MIN as i64 && i <= i8::MAX as i64 {
+                            Scalar::tinyint_with_vec(i as i8, bytes)
+                        } else if i >= i16::MIN as i64 && i <= i16::MAX as i64 {
+                            Scalar::smallint_with_vec(i as i16, bytes)
+                        } else if i >= i32::MIN as i64 && i <= i32::MAX as i64 {
+                            Scalar::integer_with_vec(i as i32, bytes)
+                        } else {
+                            Scalar::bigint_with_vec(i, bytes)
+                        }
+                    } else {
+                        Scalar::number_with_vec(decimal, bytes)
+                    }
+                } else {
+                    Scalar::number_with_vec(decimal, bytes)
+                }
+            }
             Value::String(val) => Scalar::string_with_vec(val, bytes),
             Value::Array(array) => {
                 let mut builder = ArrayRefBuilder::try_new(bytes, array.len() as u16)?;
-                write_array(&mut builder, array)?;
+                write_array(&mut builder, array, extended)?;
                 builder.finish()
             }
             Value::Object(object) => {
+                if extended && object.len() == 1 {
+                    let init_len = bytes.len();
+                    if write_extended_object_as_scalar(bytes, object)? {
+                        return Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) });
+                    }
+                }
+
                 let mut builder = ObjectRefBuilder::try_new(bytes, object.len() as u16, false)?;
-                write_object(&mut builder, object)?;
+                write_object(&mut builder, object, extended)?;
                 builder.finish()
             }
         }
@@ -81,7 +86,7 @@ impl Yason {
 }
 
 #[inline]
-fn write_array<T: ArrBuilder>(builder: &mut T, array: &[Value]) -> BuildResult<()> {
+fn write_array<T: ArrBuilder>(builder: &mut T, array: &[Value], extended: bool) -> BuildResult<()> {
     for value in array {
         match value {
             Value::Null => {
@@ -91,19 +96,42 @@ fn write_array<T: ArrBuilder>(builder: &mut T, array: &[Value]) -> BuildResult<(
                 builder.push_bool(*val)?;
             }
             Value::Number(val) => {
-                builder.push_number(number2decimal(val)?)?;
+                let decimal = number2decimal(val)?;
+                if extended {
+                    if decimal.has_fract() {
+                        builder.push_double(f64::from(decimal))?;
+                    } else if let Ok(i) = i64::try_from(decimal) {
+                        if i >= i8::MIN as i64 && i <= i8::MAX as i64 {
+                            builder.push_tinyint(i as i8)?;
+                        } else if i >= i16::MIN as i64 && i <= i16::MAX as i64 {
+                            builder.push_smallint(i as i16)?;
+                        } else if i >= i32::MIN as i64 && i <= i32::MAX as i64 {
+                            builder.push_integer(i as i32)?;
+                        } else {
+                            builder.push_bigint(i)?;
+                        }
+                    } else {
+                        builder.push_number(decimal)?;
+                    }
+                } else {
+                    builder.push_number(decimal)?;
+                }
             }
             Value::String(val) => {
                 builder.push_string(val)?;
             }
             Value::Array(val) => {
                 let mut array_builder = builder.push_array(val.len() as u16)?;
-                write_array(&mut array_builder, val)?;
+                write_array(&mut array_builder, val, extended)?;
                 array_builder.finish()?;
             }
             Value::Object(val) => {
+                if extended && val.len() == 1 && write_extended_object_to_array(builder, val)? {
+                    continue;
+                }
+
                 let mut object_builder = builder.push_object(val.len() as u16, false)?;
-                write_object(&mut object_builder, val)?;
+                write_object(&mut object_builder, val, extended)?;
                 object_builder.finish()?;
             }
         }
@@ -112,7 +140,7 @@ fn write_array<T: ArrBuilder>(builder: &mut T, array: &[Value]) -> BuildResult<(
 }
 
 #[inline]
-fn write_object<T: ObjBuilder>(builder: &mut T, object: &Map<Cow<str>, Value>) -> BuildResult<()> {
+fn write_object<T: ObjBuilder>(builder: &mut T, object: &Map<Cow<str>, Value>, extended: bool) -> BuildResult<()> {
     for (key, value) in object {
         match value {
             Value::Null => {
@@ -122,24 +150,231 @@ fn write_object<T: ObjBuilder>(builder: &mut T, object: &Map<Cow<str>, Value>) -
                 builder.push_bool(key, *val)?;
             }
             Value::Number(val) => {
-                builder.push_number(key, number2decimal(val)?)?;
+                let decimal = number2decimal(val)?;
+                if extended {
+                    if decimal.has_fract() {
+                        builder.push_double(key, f64::from(decimal))?;
+                    } else if let Ok(i) = i64::try_from(decimal) {
+                        if i >= i8::MIN as i64 && i <= i8::MAX as i64 {
+                            builder.push_tinyint(key, i as i8)?;
+                        } else if i >= i16::MIN as i64 && i <= i16::MAX as i64 {
+                            builder.push_smallint(key, i as i16)?;
+                        } else if i >= i32::MIN as i64 && i <= i32::MAX as i64 {
+                            builder.push_integer(key, i as i32)?;
+                        } else {
+                            builder.push_bigint(key, i)?;
+                        }
+                    } else {
+                        builder.push_number(key, decimal)?;
+                    }
+                } else {
+                    builder.push_number(key, decimal)?;
+                }
             }
             Value::String(val) => {
                 builder.push_string(key, val)?;
             }
             Value::Array(val) => {
                 let mut array_builder = builder.push_array(key, val.len() as u16)?;
-                write_array(&mut array_builder, val)?;
+                write_array(&mut array_builder, val, extended)?;
                 array_builder.finish()?;
             }
             Value::Object(val) => {
+                if extended && val.len() == 1 && write_extended_object_to_object(builder, key, val)? {
+                    continue;
+                }
+
                 let mut object_builder = builder.push_object(key, val.len() as u16, false)?;
-                write_object(&mut object_builder, val)?;
+                write_object(&mut object_builder, val, extended)?;
                 object_builder.finish()?;
             }
         }
     }
     Ok(())
+}
+
+fn write_extended_object_as_scalar(bytes: &mut Vec<u8>, object: &Map<Cow<str>, Value>) -> BuildResult<bool> {
+    debug_assert_eq!(object.len(), 1);
+
+    macro_rules! create_scalar {
+        ($value: expr, $bytes: expr, $ty: ty, $method: ident) => {
+            match $value {
+                Value::String(str) => {
+                    if let Ok(val) = <$ty>::from_str(str) {
+                        let _ = Scalar::$method(val, $bytes)?;
+                        return Ok(true);
+                    }
+                }
+                Value::Number(num) => {
+                    if let Ok(val) = <$ty>::from_str(num) {
+                        let _ = Scalar::$method(val, $bytes)?;
+                        return Ok(true);
+                    }
+                }
+                _ => {} // ignore other types
+            }
+        };
+    }
+
+    // SAFETY: object has one entry.
+    let (key, value) = object.iter().next().unwrap();
+    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(key)) {
+        let data_type = EXTENDED_NAME_TYPES[index].1;
+        match data_type {
+            DataType::Object => unreachable!(),
+            DataType::Array => unreachable!(),
+            DataType::String => unreachable!(),
+            DataType::Bool => unreachable!(),
+            DataType::Null => unreachable!(),
+            DataType::Number => {
+                create_scalar!(value, bytes, Number, number_with_vec);
+            }
+            DataType::Tinyint => {
+                create_scalar!(value, bytes, i8, tinyint_with_vec);
+            }
+            DataType::Smallint => {
+                create_scalar!(value, bytes, i16, smallint_with_vec);
+            }
+            DataType::Integer => {
+                create_scalar!(value, bytes, i32, integer_with_vec);
+            }
+            DataType::Bigint => {
+                create_scalar!(value, bytes, i64, bigint_with_vec);
+            }
+            DataType::Float => {
+                create_scalar!(value, bytes, f32, float_with_vec);
+            }
+            DataType::Double => {
+                create_scalar!(value, bytes, f64, double_with_vec);
+            }
+        }
+    }
+
+    Ok(false)
+}
+
+fn write_extended_object_to_object<T: ObjBuilder>(
+    builder: &mut T,
+    key: &str,
+    object: &Map<Cow<str>, Value>,
+) -> BuildResult<bool> {
+    debug_assert_eq!(object.len(), 1);
+
+    macro_rules! push_extended_numeric {
+        ($key: expr, $value: expr, $builder: expr, $ty: ident, $method: ident) => {
+            match $value {
+                Value::String(str) => {
+                    if let Ok(val) = $ty::from_str(str) {
+                        $builder.$method($key, val)?;
+                        return Ok(true);
+                    }
+                }
+                Value::Number(num) => {
+                    if let Ok(val) = $ty::from_str(num) {
+                        $builder.$method($key, val)?;
+                        return Ok(true);
+                    }
+                }
+                _ => {} // ignore other types
+            }
+        };
+    }
+
+    // SAFETY: object has one entry.
+    let (obj_key, value) = object.iter().next().unwrap();
+    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(obj_key)) {
+        let data_type = EXTENDED_NAME_TYPES[index].1;
+        match data_type {
+            DataType::Object => unreachable!(),
+            DataType::Array => unreachable!(),
+            DataType::String => unreachable!(),
+            DataType::Bool => unreachable!(),
+            DataType::Null => unreachable!(),
+            DataType::Number => {
+                push_extended_numeric!(key, value, builder, Number, push_number);
+            }
+            DataType::Tinyint => {
+                push_extended_numeric!(key, value, builder, i8, push_tinyint);
+            }
+            DataType::Smallint => {
+                push_extended_numeric!(key, value, builder, i16, push_smallint);
+            }
+            DataType::Integer => {
+                push_extended_numeric!(key, value, builder, i32, push_integer);
+            }
+            DataType::Bigint => {
+                push_extended_numeric!(key, value, builder, i64, push_bigint);
+            }
+            DataType::Float => {
+                push_extended_numeric!(key, value, builder, f32, push_float);
+            }
+            DataType::Double => {
+                push_extended_numeric!(key, value, builder, f64, push_double);
+            }
+        }
+    }
+
+    Ok(false)
+}
+
+fn write_extended_object_to_array<T: ArrBuilder>(builder: &mut T, object: &Map<Cow<str>, Value>) -> BuildResult<bool> {
+    debug_assert_eq!(object.len(), 1);
+
+    macro_rules! push_extended_numeric {
+        ($value: expr, $builder: expr, $ty: ident, $method: ident) => {
+            match $value {
+                Value::String(str) => {
+                    if let Ok(val) = $ty::from_str(str) {
+                        $builder.$method(val)?;
+                        return Ok(true);
+                    }
+                }
+                Value::Number(num) => {
+                    if let Ok(val) = $ty::from_str(num) {
+                        $builder.$method(val)?;
+                        return Ok(true);
+                    }
+                }
+                _ => {} // ignore other types
+            }
+        };
+    }
+
+    // SAFETY: object has one entry.
+    let (obj_key, value) = object.iter().next().unwrap();
+    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(obj_key)) {
+        let data_type = EXTENDED_NAME_TYPES[index].1;
+        match data_type {
+            DataType::Object => unreachable!(),
+            DataType::Array => unreachable!(),
+            DataType::String => unreachable!(),
+            DataType::Bool => unreachable!(),
+            DataType::Null => unreachable!(),
+            DataType::Number => {
+                push_extended_numeric!(value, builder, Number, push_number);
+            }
+            DataType::Tinyint => {
+                push_extended_numeric!(value, builder, i8, push_tinyint);
+            }
+            DataType::Smallint => {
+                push_extended_numeric!(value, builder, i16, push_smallint);
+            }
+            DataType::Integer => {
+                push_extended_numeric!(value, builder, i32, push_integer);
+            }
+            DataType::Bigint => {
+                push_extended_numeric!(value, builder, i64, push_bigint);
+            }
+            DataType::Float => {
+                push_extended_numeric!(value, builder, f32, push_float);
+            }
+            DataType::Double => {
+                push_extended_numeric!(value, builder, f64, push_double);
+            }
+        }
+    }
+
+    Ok(false)
 }
 
 #[inline]

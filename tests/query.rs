@@ -37,12 +37,39 @@ fn assert_eq(left: &Value, right: &Value) {
             (Value::Bool(l), Value::Bool(r)) => assert_eq!(l, r),
             _ => unreachable!(),
         },
-        DataType::Null => {}
+        DataType::Null => match (left, right) {
+            (Value::Null, Value::Null) => (),
+            _ => unreachable!(),
+        },
+        DataType::Tinyint => match (left, right) {
+            (Value::Tinyint(l), Value::Tinyint(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Smallint => match (left, right) {
+            (Value::Smallint(l), Value::Smallint(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Integer => match (left, right) {
+            (Value::Integer(l), Value::Integer(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Bigint => match (left, right) {
+            (Value::Bigint(l), Value::Bigint(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Float => match (left, right) {
+            (Value::Float(l), Value::Float(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Double => match (left, right) {
+            (Value::Double(l), Value::Double(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
     }
 }
 
 fn assert_inner(input: &str, path: &str, expected: Option<&str>, with_wrapper: bool, to_yason: bool, error: bool) {
-    let yason_buf = YasonBuf::parse(input).unwrap();
+    let yason_buf = YasonBuf::parse(input, false).unwrap();
     let yason = yason_buf.as_ref();
     let path = str::parse::<PathExpression>(path).unwrap();
 
@@ -56,7 +83,7 @@ fn assert_inner(input: &str, path: &str, expected: Option<&str>, with_wrapper: b
     if with_wrapper {
         let res = res.unwrap();
         if let Some(expected) = expected {
-            let e_yason_buf = YasonBuf::parse(expected).unwrap();
+            let e_yason_buf = YasonBuf::parse(expected, false).unwrap();
             let e_yason = e_yason_buf.as_ref();
             let expected_value = Value::try_from(e_yason).unwrap();
 
@@ -90,7 +117,7 @@ fn assert_inner(input: &str, path: &str, expected: Option<&str>, with_wrapper: b
         assert!(res.is_ok());
         let res = res.unwrap();
         if let Some(expected) = expected {
-            let e_yason_buf = YasonBuf::parse(expected).unwrap();
+            let e_yason_buf = YasonBuf::parse(expected, false).unwrap();
             let e_yason = e_yason_buf.as_ref();
             let expected_value = Value::try_from(e_yason).unwrap();
 
@@ -644,7 +671,7 @@ fn test_query_with_wrapper() {
 #[test]
 fn test_exists_error() {
     fn assert(input: &str, path: &str) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let yason = yason_buf.as_ref();
         let path = str::parse::<PathExpression>(path).unwrap();
 
@@ -665,7 +692,7 @@ fn test_exists_error() {
 #[test]
 fn test_exists() {
     fn assert(input: &str, path: &str, expected: bool) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let yason = yason_buf.as_ref();
         let path = str::parse::<PathExpression>(path).unwrap();
 
@@ -798,37 +825,37 @@ mod test_queried_value_format_to {
         let value = path.query(yason, with_wrapper, query_buf, result_buf).unwrap();
 
         let mut res = String::new();
-        value.format_to(false, &mut res).unwrap();
+        value.format_to(false, false, &mut res).unwrap();
         assert_eq!(res.as_str(), compact);
 
         res.clear();
-        value.format_to(true, &mut res).unwrap();
+        value.format_to(true, false, &mut res).unwrap();
         assert_eq!(res.as_str(), pretty);
     }
 
     fn assert_queried_none(input: &str, path: &str) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
         format(yason_buf.as_ref(), &path, "", "", false, None, None);
     }
 
     fn assert_queried_value(input: &str, path: &str, compact: &str, pretty: &str) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
         format(yason_buf.as_ref(), &path, compact, pretty, false, None, None);
     }
 
     fn assert_queried_values(input: &str, path: &str, compact: &str, pretty: &str) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
         format(yason_buf.as_ref(), &path, compact, pretty, true, None, None);
     }
 
     fn assert_queried_values_ref(input: &str, path: &str, compact: &str, pretty: &str) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
         let mut query_buf = Vec::new();
@@ -844,7 +871,7 @@ mod test_queried_value_format_to {
     }
 
     fn assert_queried_yason(input: &str, path: &str, compact: &str, pretty: &str) {
-        let yason_buf = YasonBuf::parse(input).unwrap();
+        let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
         let mut query_buf = Vec::new();

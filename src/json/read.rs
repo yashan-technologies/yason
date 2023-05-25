@@ -7,7 +7,7 @@ pub struct SliceRead<'a> {
 
 impl<'a> SliceRead<'a> {
     #[inline]
-    pub fn new(slice: &'a [u8]) -> Self {
+    pub const fn new(slice: &'a [u8]) -> Self {
         Self {
             slice,
             index: 0,

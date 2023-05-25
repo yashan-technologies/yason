@@ -30,7 +30,7 @@ pub struct Tokenizer<'a> {
 
 impl<'a> Tokenizer<'a> {
     #[inline]
-    pub fn new(s: &'a str) -> Self {
+    pub const fn new(s: &'a str) -> Self {
         Self {
             source: SliceRead::new(s.as_bytes()),
         }

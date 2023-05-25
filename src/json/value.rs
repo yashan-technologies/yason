@@ -17,6 +17,7 @@ pub enum Value<'a> {
     Object(Map<Cow<'a, str>, Value<'a>>),
 }
 
+#[allow(dead_code)]
 impl<'a> Value<'a> {
     #[inline]
     pub fn is_null(&self) -> bool {
@@ -57,7 +58,7 @@ impl<'a> Value<'a> {
     #[inline]
     pub fn as_number(&self) -> Option<&'a str> {
         match self {
-            Value::Number(n) => Some(n.to_owned()),
+            Value::Number(n) => Some(n),
             _ => None,
         }
     }

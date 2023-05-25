@@ -237,7 +237,7 @@ fn bench_sort_new_builder(bench: &mut Bencher) {
 fn bench_query(bench: &mut Bencher) {
     let input = r#"{"key1": 123, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789, "key3": {"key6": 123}}, [10, false, null]], "key5": {"key1": true, "key2": 789, "key3": null}}"#;
     let path = "$.key4[last - 20, last - 2, 2 to 4, 0].*[0]..key2.type()";
-    let yason_buf = YasonBuf::parse(input).unwrap();
+    let yason_buf = YasonBuf::parse(input, false).unwrap();
     let yason = yason_buf.as_ref();
     let path = str::parse::<PathExpression>(path).unwrap();
 
@@ -252,16 +252,16 @@ fn bench_path_parse(bench: &mut Bencher) {
 
 fn bench_format(bench: &mut Bencher) {
     let input = r#"{"key1": 123, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789, "key3": {"key6": 123}}, [10, false, null]], "key5": {"key1": true, "key2": 789, "key3": null}}"#;
-    let yason_buf = YasonBuf::parse(input).unwrap();
+    let yason_buf = YasonBuf::parse(input, false).unwrap();
     let yason = yason_buf.as_ref();
 
-    bench.iter(|| format!("{}", yason.format(true)))
+    bench.iter(|| format!("{}", yason.format(true, false)))
 }
 
 fn bench_parse_json_to_yasonbuf(bench: &mut Bencher) {
     let input = r#"{"key1": 12345678910, "key2": true, "key3": null, "key4": [456, false, null, {"key1": true, "key2": 789e+10, "key3": {"key6": 123456789987654321}}, [123456789987654321.123456789987654321, false, null]], "key5": {"key1": true, "key2": 789e+100, "key3": null}}"#;
 
-    bench.iter(|| YasonBuf::parse(input))
+    bench.iter(|| YasonBuf::parse(input, false))
 }
 
 fn bench_parse_json_to_yason(bench: &mut Bencher) {
@@ -271,7 +271,7 @@ fn bench_parse_json_to_yason(bench: &mut Bencher) {
     bench.iter(|| {
         buf.clear();
         unsafe {
-            Yason::parse_to(buf.as_mut_vec(), input).unwrap();
+            Yason::parse_to(buf.as_mut_vec(), input, false).unwrap();
         }
     })
 }

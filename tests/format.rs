@@ -2,23 +2,36 @@
 
 use yason::YasonBuf;
 
-fn assert_fmt(input: &str, expected: &str, pretty: bool) {
-    let yason_buf = YasonBuf::parse(input).unwrap();
+fn assert_fmt(input: &str, expected: &str, pretty: bool, extended: bool) {
+    let yason_buf = YasonBuf::parse(input, extended).unwrap();
     let yason = yason_buf.as_ref();
-    assert_eq!(format!("{}", yason.format(pretty)), expected)
+    assert_eq!(format!("{}", yason.format(pretty, extended)), expected)
 }
 
 fn assert_compact_fmt(input: &str, expected: &str) {
-    assert_fmt(input, expected, false)
+    assert_fmt(input, expected, false, false)
+}
+
+fn assert_extended_compact_fmt(input: &str, expected: &str) {
+    assert_fmt(input, expected, false, true)
 }
 
 fn assert_pretty_fmt(input: &str, expected: &str) {
-    assert_fmt(input, expected, true)
+    assert_fmt(input, expected, true, false)
+}
+
+fn assert_extended_pretty_fmt(input: &str, expected: &str) {
+    assert_fmt(input, expected, true, true)
 }
 
 fn assert_scalar_fmt(input: &str, expected: &str) {
     assert_compact_fmt(input, expected);
     assert_pretty_fmt(input, expected);
+}
+
+fn assert_extended_scalar_fmt(input: &str, expected: &str, pretty_expected: &str) {
+    assert_fmt(input, expected, false, true);
+    assert_fmt(input, pretty_expected, true, true);
 }
 
 #[test]
@@ -157,6 +170,42 @@ fn test_scalar_fmt() {
             "1.2345678901234567890123456789012345678E+40",
         );
     }
+
+    assert_extended_scalar_fmt(r#"{"$numberByte": 127}"#, r#"127"#, r#"127"#);
+    assert_extended_scalar_fmt(r#"{"$numberShort": 12345}"#, r#"12345"#, r#"12345"#);
+    assert_extended_scalar_fmt(r#"{"$numberInt": 1234567}"#, r#"1234567"#, r#"1234567"#);
+    assert_extended_scalar_fmt(
+        r#"{"$numberLong": 9007199254740991}"#,
+        r#"9007199254740991"#,
+        r#"9007199254740991"#,
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberLong": 9007199254740992}"#,
+        r#"{"$numberLong":"9007199254740992"}"#,
+        "{\n  \"$numberLong\" : \"9007199254740992\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberFloat": 123.4567}"#,
+        r#"{"$numberFloat":"123.4567"}"#,
+        "{\n  \"$numberFloat\" : \"123.4567\"\n}",
+    );
+    assert_extended_scalar_fmt(r#"{"$numberDouble": 12.3456789}"#, r#"12.3456789"#, r#"12.3456789"#);
+    assert_extended_scalar_fmt(r#"{"$numberDecimal": 127}"#, r#"127"#, r#"127"#);
+    assert_extended_scalar_fmt(
+        r#"{"$numberDecimal": 12.3456789}"#,
+        r#"{"$numberDecimal":"12.3456789"}"#,
+        "{\n  \"$numberDecimal\" : \"12.3456789\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberDecimal": 9007199254740991}"#,
+        r#"9007199254740991"#,
+        r#"9007199254740991"#,
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberDecimal": 9007199254740992}"#,
+        r#"{"$numberLong":"9007199254740992"}"#,
+        "{\n  \"$numberLong\" : \"9007199254740992\"\n}",
+    );
 }
 
 #[test]
@@ -177,6 +226,14 @@ fn test_compact_fmt() {
             r#"{"key1": false, "key2": "abc", "key3": 456, "key4": null, "key5": {"key1": 789}, "key6": ["asd"]}"#,
             r#"{"key1":false,"key2":"abc","key3":456,"key4":null,"key5":{"key1":789},"key6":["asd"]}"#,
         );
+        assert_extended_compact_fmt(
+            r#"{"$numberByte": "123", "$numberShort": "12345", "$numberInt": 1234567, "$numberLong": 1234567890, "$numberDecimal": "12.3456789", "$numberFloat": 123.456, "$numberDouble": 12.3456789}"#,
+            r#"{"$numberInt":1234567,"$numberByte":"123","$numberLong":1234567890,"$numberFloat":123.456,"$numberShort":"12345","$numberDouble":12.3456789,"$numberDecimal":"12.3456789"}"#,
+        );
+        assert_extended_compact_fmt(
+            r#"{ "tinyint": {"$numberByte": "123"}, "smallint": {"$numberShort": "12345"}, "integer":{"$numberInt": 1234567}, "bigint": {"$numberLong": 1234567890}, "number": {"$numberDecimal": "12.3456789"}, "float":{"$numberFloat": 123.456}, "double": {"$numberDouble": 12.3456789}}"#,
+            r#"{"float":{"$numberFloat":"123.456"},"bigint":1234567890,"double":12.3456789,"number":{"$numberDecimal":"12.3456789"},"integer":1234567,"tinyint":123,"smallint":12345}"#,
+        );
     }
 
     // array
@@ -191,6 +248,10 @@ fn test_compact_fmt() {
         assert_compact_fmt(
             r#"[789, null, "rty", false, [901, true, null, "ghh"], {"key1": true, "key2": 1e23}]"#,
             r#"[789,null,"rty",false,[901,true,null,"ghh"],{"key1":true,"key2":100000000000000000000000}]"#,
+        );
+        assert_extended_compact_fmt(
+            r#"[{"$numberByte": "123"}, {"$numberShort": "12345"}, {"$numberInt": 1234567}, {"$numberLong": 1234567890}, {"$numberDecimal": "12.3456789"}, {"$numberFloat": 123.456}, {"$numberDouble": 12.3456789}]"#,
+            r#"[123,12345,1234567,1234567890,{"$numberDecimal":"12.3456789"},{"$numberFloat":"123.456"},12.3456789]"#,
         );
     }
 }
@@ -217,6 +278,14 @@ fn test_pretty_fmt() {
             r#"{"key1": false, "key2": "abc", "key3": 456, "key4": null, "key5": {"key1": 789}, "key6": ["asd"]}"#,
             "{\n  \"key1\" : false,\n  \"key2\" : \"abc\",\n  \"key3\" : 456,\n  \"key4\" : null,\n  \"key5\" : \n  {\n    \"key1\" : 789\n  },\n  \"key6\" : \n  [\n    \"asd\"\n  ]\n}",
         );
+        assert_extended_pretty_fmt(
+            r#"{"$numberByte": "123", "$numberShort": "12345", "$numberInt": 1234567, "$numberLong": 1234567890, "$numberDecimal": "12.3456789", "$numberFloat": 123.456, "$numberDouble": 12.3456789}"#,
+            "{\n  \"$numberInt\" : 1234567,\n  \"$numberByte\" : \"123\",\n  \"$numberLong\" : 1234567890,\n  \"$numberFloat\" : 123.456,\n  \"$numberShort\" : \"12345\",\n  \"$numberDouble\" : 12.3456789,\n  \"$numberDecimal\" : \"12.3456789\"\n}",
+        );
+        assert_extended_pretty_fmt(
+            r#"{ "tinyint": {"$numberByte": "123"}, "smallint": {"$numberShort": "12345"}, "integer":{"$numberInt": 1234567}, "bigint": {"$numberLong": 1234567890}, "number": {"$numberDecimal": "12.3456789"}, "float":{"$numberFloat": 123.456}, "double": {"$numberDouble": 12.3456789}}"#,
+            "{\n  \"float\" : {\n    \"$numberFloat\" : \"123.456\"\n  },\n  \"bigint\" : 1234567890,\n  \"double\" : 12.3456789,\n  \"number\" : {\n    \"$numberDecimal\" : \"12.3456789\"\n  },\n  \"integer\" : 1234567,\n  \"tinyint\" : 123,\n  \"smallint\" : 12345\n}",
+        );
     }
 
     // array
@@ -237,6 +306,10 @@ fn test_pretty_fmt() {
         assert_pretty_fmt(
             r#"[789, null, "rty", false, [901, true, null, "ghh"], {"key1": true, "key2": 1e23}]"#,
             "[\n  789,\n  null,\n  \"rty\",\n  false,\n  [\n    901,\n    true,\n    null,\n    \"ghh\"\n  ],\n  {\n    \"key1\" : true,\n    \"key2\" : 100000000000000000000000\n  }\n]",
+        );
+        assert_extended_pretty_fmt(
+            r#"[{"$numberByte": "123"}, {"$numberShort": "12345"}, {"$numberInt": 1234567}, {"$numberLong": 1234567890}, {"$numberDecimal": "12.3456789"}, {"$numberFloat": 123.456}, {"$numberDouble": 12.3456789}]"#,
+            "[\n  123,\n  12345,\n  1234567,\n  1234567890,\n  {\n    \"$numberDecimal\" : \"12.3456789\"\n  },\n  {\n    \"$numberFloat\" : \"123.456\"\n  },\n  12.3456789\n]",
         );
     }
 }

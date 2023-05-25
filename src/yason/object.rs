@@ -184,6 +184,78 @@ impl<'a> Object<'a> {
         Ok(None)
     }
 
+    /// Gets a tinyint for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn tinyint<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<i8>> {
+        let found = self.check_key(key.as_ref(), DataType::Tinyint)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_tinyint(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a smallint for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn smallint<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<i16>> {
+        let found = self.check_key(key.as_ref(), DataType::Smallint)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_smallint(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a integer for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn integer<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<i32>> {
+        let found = self.check_key(key.as_ref(), DataType::Integer)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_integer(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a bigint for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn bigint<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<i64>> {
+        let found = self.check_key(key.as_ref(), DataType::Bigint)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_bigint(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a float for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn float<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<f32>> {
+        let found = self.check_key(key.as_ref(), DataType::Float)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_float(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a double for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn double<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<f64>> {
+        let found = self.check_key(key.as_ref(), DataType::Double)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_double(value_pos)?));
+        }
+        Ok(None)
+    }
+
     #[inline]
     pub(crate) fn equals<T: AsRef<Object<'a>>>(&self, other: T) -> YasonResult<bool> {
         let other = other.as_ref();
@@ -241,6 +313,12 @@ impl<'a> Object<'a> {
             DataType::Number => Value::Number(self.0.read_number(value_pos)?),
             DataType::Bool => Value::Bool(self.0.read_bool(value_pos)?),
             DataType::Null => Value::Null,
+            DataType::Tinyint => Value::Tinyint(self.0.read_tinyint(value_pos)?),
+            DataType::Smallint => Value::Smallint(self.0.read_smallint(value_pos)?),
+            DataType::Integer => Value::Integer(self.0.read_integer(value_pos)?),
+            DataType::Bigint => Value::Bigint(self.0.read_bigint(value_pos)?),
+            DataType::Float => Value::Float(self.0.read_float(value_pos)?),
+            DataType::Double => Value::Double(self.0.read_double(value_pos)?),
         };
         Ok(value)
     }

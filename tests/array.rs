@@ -31,9 +31,19 @@ fn assert_null(input: Value) {
     assert!(res);
 }
 
+macro_rules! assert_value_eq {
+    ($ty: ident, $input: expr, $expected: expr) => {
+        if let Value::$ty(value) = $input {
+            assert_eq!(value, $expected);
+        } else {
+            panic!("type inconsistency");
+        };
+    };
+}
+
 fn assert_array(yason: &Yason) {
     let array = yason.array().unwrap();
-    assert_eq!(array.len().unwrap(), 6);
+    assert_eq!(array.len().unwrap(), 12);
     assert!(!array.is_empty().unwrap());
     assert_eq!(array.type_of(0).unwrap(), DataType::Number);
     assert!(array.is_type(1, DataType::String).unwrap());
@@ -43,12 +53,18 @@ fn assert_array(yason: &Yason) {
     assert_null(array.get(2).unwrap());
     assert!(array.is_null(2).unwrap());
     assert_bool(array.get(3).unwrap(), false);
-    assert_eq!(array.get(4).unwrap().data_type(), DataType::Array);
-    assert_eq!(array.get(5).unwrap().data_type(), DataType::Object);
+    assert_value_eq!(Tinyint, array.get(4).unwrap(), 123_i8);
+    assert_value_eq!(Smallint, array.get(5).unwrap(), 12345_i16);
+    assert_value_eq!(Integer, array.get(6).unwrap(), 1234567_i32);
+    assert_value_eq!(Bigint, array.get(7).unwrap(), 12345678_i64);
+    assert_value_eq!(Float, array.get(8).unwrap(), 123.456_f32);
+    assert_value_eq!(Double, array.get(9).unwrap(), 12.3456789_f64);
+    assert_eq!(array.get(10).unwrap().data_type(), DataType::Array);
+    assert_eq!(array.get(11).unwrap().data_type(), DataType::Object);
 
     assert!(array.bool(0).is_err());
 
-    let value = array.get(10);
+    let value = array.get(12);
     assert!(value.is_err());
 
     // tests iter
@@ -63,14 +79,32 @@ fn assert_array(yason: &Yason) {
         } else if id == 3 {
             assert_bool(value, false);
         } else if id == 4 {
-            assert_eq!(value.data_type(), DataType::Array);
+            assert_value_eq!(Tinyint, value, 123_i8);
         } else if id == 5 {
+            assert_value_eq!(Smallint, value, 12345_i16);
+        } else if id == 6 {
+            assert_value_eq!(Integer, value, 1234567_i32);
+        } else if id == 7 {
+            assert_value_eq!(Bigint, value, 12345678_i64);
+        } else if id == 8 {
+            assert_value_eq!(Float, value, 123.456_f32);
+        } else if id == 9 {
+            assert_value_eq!(Double, value, 12.3456789_f64);
+        } else if id == 10 {
+            assert_eq!(value.data_type(), DataType::Array);
+        } else if id == 11 {
             assert_eq!(value.data_type(), DataType::Object);
         }
     }
 
-    assert_eq!(array.object(5).unwrap().string("key").unwrap().unwrap(), "value");
-    assert!(array.array(4).unwrap().bool(0).unwrap());
+    assert_eq!(array.object(11).unwrap().string("key").unwrap().unwrap(), "value");
+    assert!(array.array(10).unwrap().bool(0).unwrap());
+    assert_eq!(array.double(9).unwrap(), 12.3456789_f64);
+    assert_eq!(array.float(8).unwrap(), 123.456_f32);
+    assert_eq!(array.bigint(7).unwrap(), 12345678_i64);
+    assert_eq!(array.integer(6).unwrap(), 1234567_i32);
+    assert_eq!(array.smallint(5).unwrap(), 12345_i16);
+    assert_eq!(array.tinyint(4).unwrap(), 123_i8);
     assert!(!array.bool(3).unwrap());
     assert_eq!(array.string(1).unwrap(), "abc");
     assert_eq!(array.number(0).unwrap(), Number::from(123));
@@ -78,11 +112,17 @@ fn assert_array(yason: &Yason) {
 
 fn create_yason() -> YasonBuf {
     // [123, "abc", null, false, [true], {key: value}]
-    let mut builder = ArrayBuilder::try_new(6).unwrap();
+    let mut builder = ArrayBuilder::try_new(12).unwrap();
     builder.push_number(Number::from(123)).unwrap();
     builder.push_string("abc").unwrap();
     builder.push_null().unwrap();
     builder.push_bool(false).unwrap();
+    builder.push_tinyint(123_i8).unwrap();
+    builder.push_smallint(12345_i16).unwrap();
+    builder.push_integer(1234567_i32).unwrap();
+    builder.push_bigint(12345678_i64).unwrap();
+    builder.push_float(123.456_f32).unwrap();
+    builder.push_double(12.3456789_f64).unwrap();
 
     let mut array_builder = builder.push_array(1).unwrap();
     array_builder.push_bool(true).unwrap();
@@ -97,11 +137,17 @@ fn create_yason() -> YasonBuf {
 
 fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
     // [123, "abc", null, false, [true], {key: value}]
-    let mut builder = ArrayRefBuilder::try_new(bytes, 6).unwrap();
+    let mut builder = ArrayRefBuilder::try_new(bytes, 12).unwrap();
     builder.push_number(Number::from(123)).unwrap();
     builder.push_string("abc").unwrap();
     builder.push_null().unwrap();
     builder.push_bool(false).unwrap();
+    builder.push_tinyint(123_i8).unwrap();
+    builder.push_smallint(12345_i16).unwrap();
+    builder.push_integer(1234567_i32).unwrap();
+    builder.push_bigint(12345678_i64).unwrap();
+    builder.push_float(123.456_f32).unwrap();
+    builder.push_double(12.3456789_f64).unwrap();
 
     let mut array_builder = builder.push_array(1).unwrap();
     array_builder.push_bool(true).unwrap();

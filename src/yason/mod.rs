@@ -237,22 +237,94 @@ impl Yason {
         self.is_type(0, DataType::Null as u8)
     }
 
+    /// If `Yason` is `Tinyint`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn tinyint(&self) -> YasonResult<i8> {
+        self.check_type(0, DataType::Tinyint)?;
+        unsafe { self.tinyint_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn tinyint_unchecked(&self) -> YasonResult<i8> {
+        debug_assert!(self.data_type()? == DataType::Tinyint);
+        self.read_tinyint(0)
+    }
+
+    /// If `Yason` is `Smallint`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn smallint(&self) -> YasonResult<i16> {
+        self.check_type(0, DataType::Smallint)?;
+        unsafe { self.smallint_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn smallint_unchecked(&self) -> YasonResult<i16> {
+        debug_assert!(self.data_type()? == DataType::Smallint);
+        self.read_smallint(0)
+    }
+
+    /// If `Yason` is `Integer`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn integer(&self) -> YasonResult<i32> {
+        self.check_type(0, DataType::Integer)?;
+        unsafe { self.integer_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn integer_unchecked(&self) -> YasonResult<i32> {
+        debug_assert!(self.data_type()? == DataType::Integer);
+        self.read_integer(0)
+    }
+
+    /// If `Yason` is `Bigint`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn bigint(&self) -> YasonResult<i64> {
+        self.check_type(0, DataType::Bigint)?;
+        unsafe { self.bigint_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn bigint_unchecked(&self) -> YasonResult<i64> {
+        debug_assert!(self.data_type()? == DataType::Bigint);
+        self.read_bigint(0)
+    }
+
+    /// If `Yason` is `Float`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn float(&self) -> YasonResult<f32> {
+        self.check_type(0, DataType::Float)?;
+        unsafe { self.float_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn float_unchecked(&self) -> YasonResult<f32> {
+        debug_assert!(self.data_type()? == DataType::Float);
+        self.read_float(0)
+    }
+
+    /// If `Yason` is `Double`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn double(&self) -> YasonResult<f64> {
+        self.check_type(0, DataType::Double)?;
+        unsafe { self.double_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn double_unchecked(&self) -> YasonResult<f64> {
+        debug_assert!(self.data_type()? == DataType::Double);
+        self.read_double(0)
+    }
+
     /// Formats the yason as a compact or pretty string.
     #[inline]
-    pub fn format(&self, pretty: bool) -> impl Display + '_ {
-        LazyFormat::new(self, pretty)
+    pub fn format(&self, pretty: bool, extended: bool) -> impl Display + '_ {
+        LazyFormat::new(self, pretty, extended)
     }
 
     /// Formats the yason as a compact or pretty string to a provided buffer.
     #[inline]
-    pub fn format_to<W: fmt::Write>(&self, pretty: bool, buf: &mut W) -> FormatResult<()> {
-        if pretty {
-            let mut fmt = PrettyFormatter::new();
-            fmt.format(self, buf)
-        } else {
-            let mut fmt = CompactFormatter::new();
-            fmt.format(self, buf)
-        }
+    pub fn format_to<W: fmt::Write>(&self, pretty: bool, extended: bool, buf: &mut W) -> FormatResult<()> {
+        format_to!(buf, pretty, extended, self, format)
     }
 
     #[inline]
@@ -309,10 +381,52 @@ impl Yason {
     }
 
     #[inline]
+    fn read_tinyint(&self, index: usize) -> YasonResult<i8> {
+        self.get(index + DATA_TYPE_SIZE).map(|i| i as i8)
+    }
+
+    #[inline]
+    fn read_smallint(&self, index: usize) -> YasonResult<i16> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + size_of::<i16>();
+        let bytes = self.slice(index, end)?;
+        Ok(i16::from_le_bytes(slice_to_array(bytes)))
+    }
+
+    #[inline]
     fn read_i32(&self, index: usize) -> YasonResult<i32> {
         let end = index + size_of::<i32>();
         let bytes = self.slice(index, end)?;
         Ok(i32::from_le_bytes(slice_to_array(bytes)))
+    }
+
+    #[inline]
+    fn read_integer(&self, index: usize) -> YasonResult<i32> {
+        self.read_i32(index + DATA_TYPE_SIZE)
+    }
+
+    #[inline]
+    fn read_bigint(&self, index: usize) -> YasonResult<i64> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + size_of::<i64>();
+        let bytes = self.slice(index, end)?;
+        Ok(i64::from_le_bytes(slice_to_array(bytes)))
+    }
+
+    #[inline]
+    fn read_float(&self, index: usize) -> YasonResult<f32> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + size_of::<f32>();
+        let bytes = self.slice(index, end)?;
+        Ok(f32::from_le_bytes(slice_to_array(bytes)))
+    }
+
+    #[inline]
+    fn read_double(&self, index: usize) -> YasonResult<f64> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + size_of::<f64>();
+        let bytes = self.slice(index, end)?;
+        Ok(f64::from_le_bytes(slice_to_array(bytes)))
     }
 
     #[inline]
@@ -410,6 +524,12 @@ pub enum Value<'a> {
     Number(Number),
     Bool(bool),
     Null,
+    Tinyint(i8),
+    Smallint(i16),
+    Integer(i32),
+    Bigint(i64),
+    Float(f32),
+    Double(f64),
 }
 
 impl<'a> Value<'a> {
@@ -422,6 +542,12 @@ impl<'a> Value<'a> {
             Value::Number(_) => DataType::Number,
             Value::Bool(_) => DataType::Bool,
             Value::Null => DataType::Null,
+            Value::Tinyint(_) => DataType::Tinyint,
+            Value::Smallint(_) => DataType::Smallint,
+            Value::Integer(_) => DataType::Integer,
+            Value::Bigint(_) => DataType::Bigint,
+            Value::Float(_) => DataType::Float,
+            Value::Double(_) => DataType::Double,
         }
     }
 
@@ -434,29 +560,63 @@ impl<'a> Value<'a> {
             Value::Number(num) => Ok(Scalar::number_with_vec(num, buf)?),
             Value::Bool(bool) => Ok(Scalar::bool_with_vec(*bool, buf)?),
             Value::Null => Ok(Scalar::null_with_vec(buf)?),
+            Value::Tinyint(i) => Ok(Scalar::tinyint_with_vec(*i, buf)?),
+            Value::Smallint(i) => Ok(Scalar::smallint_with_vec(*i, buf)?),
+            Value::Integer(i) => Ok(Scalar::integer_with_vec(*i, buf)?),
+            Value::Bigint(i) => Ok(Scalar::bigint_with_vec(*i, buf)?),
+            Value::Float(f) => Ok(Scalar::float_with_vec(*f, buf)?),
+            Value::Double(f) => Ok(Scalar::double_with_vec(*f, buf)?),
         }
     }
 
     #[inline]
-    pub(crate) fn format_to<W: fmt::Write>(&self, pretty: bool, writer: &mut W) -> FormatResult<()> {
+    pub(crate) fn format_to<W: fmt::Write>(&self, pretty: bool, extended: bool, writer: &mut W) -> FormatResult<()> {
         match self {
-            Value::Object(object) => object.yason().format_to(pretty, writer),
-            Value::Array(array) => array.yason().format_to(pretty, writer),
+            Value::Object(object) => object.yason().format_to(pretty, extended, writer),
+            Value::Array(array) => array.yason().format_to(pretty, extended, writer),
             Value::String(str) => {
-                let mut fmt = CompactFormatter::new();
+                // string are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
                 fmt.write_string(str, writer)
             }
             Value::Number(number) => {
-                let mut fmt = CompactFormatter::new();
-                fmt.write_number(number, writer)
+                format_to!(writer, pretty, extended, number, write_number)
             }
             Value::Bool(bool) => {
-                let mut fmt = CompactFormatter::new();
+                // bool are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
                 fmt.write_bool(*bool, writer)
             }
             Value::Null => {
-                let mut fmt = CompactFormatter::new();
+                // null are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
                 fmt.write_null(writer)
+            }
+            Value::Tinyint(i) => {
+                // tinyint are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
+                fmt.write_tinyint(*i, writer)
+            }
+            Value::Smallint(i) => {
+                // smallint are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
+                fmt.write_smallint(*i, writer)
+            }
+            Value::Integer(i) => {
+                // integer are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
+                fmt.write_integer(*i, writer)
+            }
+            Value::Bigint(i) => {
+                format_to!(writer, pretty, extended, *i, write_bigint)
+            }
+            Value::Float(f) => {
+                format_to!(writer, pretty, extended, *f, write_float)
+            }
+            Value::Double(f) => {
+                // double are formatted the same in standard and extended mode
+                let mut fmt = CompactFormatter::new(extended);
+                fmt.write_double(*f, writer)
             }
         }
     }
@@ -474,6 +634,12 @@ impl<'a> TryFrom<&'a Yason> for Value<'a> {
             DataType::Number => Ok(Value::Number(unsafe { yason.number_unchecked()? })),
             DataType::Bool => Ok(Value::Bool(unsafe { yason.bool_unchecked()? })),
             DataType::Null => Ok(Value::Null),
+            DataType::Tinyint => Ok(Value::Tinyint(unsafe { yason.tinyint_unchecked()? })),
+            DataType::Smallint => Ok(Value::Smallint(unsafe { yason.smallint_unchecked()? })),
+            DataType::Integer => Ok(Value::Integer(unsafe { yason.integer_unchecked()? })),
+            DataType::Bigint => Ok(Value::Bigint(unsafe { yason.bigint_unchecked()? })),
+            DataType::Float => Ok(Value::Float(unsafe { yason.float_unchecked()? })),
+            DataType::Double => Ok(Value::Double(unsafe { yason.double_unchecked()? })),
         }
     }
 }
@@ -510,6 +676,12 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
                 DataType::Number => Value::Number(self.number()?),
                 DataType::Bool => Value::Bool(self.bool()?),
                 DataType::Null => Value::Null,
+                DataType::Tinyint => Value::Tinyint(self.tinyint()?),
+                DataType::Smallint => Value::Smallint(self.smallint()?),
+                DataType::Integer => Value::Integer(self.integer()?),
+                DataType::Bigint => Value::Bigint(self.bigint()?),
+                DataType::Float => Value::Float(self.float()?),
+                DataType::Double => Value::Double(self.double()?),
             }
         };
 
@@ -567,6 +739,66 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     }
 
     #[inline]
+    pub unsafe fn tinyint(&self) -> YasonResult<i8> {
+        debug_assert!(self.ty == DataType::Tinyint);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_tinyint(self.value_pos)
+        } else {
+            self.yason.read_tinyint(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn smallint(&self) -> YasonResult<i16> {
+        debug_assert!(self.ty == DataType::Smallint);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_smallint(self.value_pos)
+        } else {
+            self.yason.read_smallint(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn integer(&self) -> YasonResult<i32> {
+        debug_assert!(self.ty == DataType::Integer);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_integer(self.value_pos)
+        } else {
+            self.yason.read_integer(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn bigint(&self) -> YasonResult<i64> {
+        debug_assert!(self.ty == DataType::Bigint);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_bigint(self.value_pos)
+        } else {
+            self.yason.read_bigint(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn float(&self) -> YasonResult<f32> {
+        debug_assert!(self.ty == DataType::Float);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_float(self.value_pos)
+        } else {
+            self.yason.read_float(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn double(&self) -> YasonResult<f64> {
+        debug_assert!(self.ty == DataType::Double);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_double(self.value_pos)
+        } else {
+            self.yason.read_double(self.value_pos)
+        }
+    }
+
+    #[inline]
     pub fn equals(&self, other: LazyValue<IN_ARRAY>) -> YasonResult<bool> {
         if self.data_type() != other.data_type() || self.yason.bytes.len() != other.yason.bytes.len() {
             return Ok(false);
@@ -579,6 +811,12 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
             DataType::Number => unsafe { Ok(self.number()?.eq(&other.number()?)) },
             DataType::Bool => unsafe { Ok(self.bool()?.eq(&other.bool()?)) },
             DataType::Null => Ok(true),
+            DataType::Tinyint => unsafe { Ok(self.tinyint()?.eq(&other.tinyint()?)) },
+            DataType::Smallint => unsafe { Ok(self.smallint()?.eq(&other.smallint()?)) },
+            DataType::Integer => unsafe { Ok(self.integer()?.eq(&other.integer()?)) },
+            DataType::Bigint => unsafe { Ok(self.bigint()?.eq(&other.bigint()?)) },
+            DataType::Float => unsafe { Ok(self.float()?.eq(&other.float()?)) },
+            DataType::Double => unsafe { Ok(self.double()?.eq(&other.double()?)) },
         }
     }
 }

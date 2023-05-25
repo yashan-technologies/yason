@@ -12,7 +12,8 @@ impl serde::Serialize for YasonBuf {
     {
         let mut buf = String::new();
         if serializer.is_human_readable() {
-            self.format_to(false, &mut buf).map_err(serde::ser::Error::custom)?;
+            self.format_to(false, true, &mut buf)
+                .map_err(serde::ser::Error::custom)?;
             buf.serialize(serializer)
         } else {
             serializer.serialize_bytes(self.as_bytes())
@@ -42,7 +43,7 @@ impl<'de> serde::Deserialize<'de> for YasonBuf {
             where
                 E: serde::de::Error,
             {
-                YasonBuf::parse(v).map_err(serde::de::Error::custom)
+                YasonBuf::parse(v, true).map_err(serde::de::Error::custom)
             }
 
             #[inline]
@@ -72,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let yason_buf = YasonBuf::parse(r#"[123, true, null, "abc"]"#).unwrap();
+        let yason_buf = YasonBuf::parse(r#"[123, true, null, "abc"]"#, false).unwrap();
 
         let bin = bincode::serialize(&yason_buf).unwrap();
         let bin_yason_buf: YasonBuf = bincode::deserialize(&bin).unwrap();

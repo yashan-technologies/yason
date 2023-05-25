@@ -14,7 +14,7 @@ pub(crate) struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     #[inline]
-    pub fn new(s: &'a str) -> Self {
+    pub const fn new(s: &'a str) -> Self {
         Self {
             tokenizer: Tokenizer::<'_>::new(s),
         }

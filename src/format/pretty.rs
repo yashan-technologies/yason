@@ -28,20 +28,27 @@ pub struct PrettyFormatter<'a> {
     options: PrettyOptions<'a>,
     cur_indent_level: usize,
     has_value: bool,
+    extended: bool,
 }
 
 impl<'a> PrettyFormatter<'a> {
     #[inline]
-    pub(crate) const fn new() -> Self {
+    pub(crate) const fn new(extended: bool) -> Self {
         Self {
             options: PrettyOptions::new(2, true, true, b" : "),
             cur_indent_level: 0,
             has_value: false,
+            extended,
         }
     }
 }
 
 impl Formatter for PrettyFormatter<'_> {
+    #[inline]
+    fn extended(&self) -> bool {
+        self.extended
+    }
+
     #[inline]
     fn write_object_value<W: fmt::Write, const IN_ARRAY: bool>(
         &mut self,

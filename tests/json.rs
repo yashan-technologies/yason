@@ -4,8 +4,8 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 use yason::{Array, DataType, Number, Object, Value, YasonBuf};
 
-fn assert_scalar(input: &str, expected: &str, expected_type: DataType) {
-    let yason = YasonBuf::parse(input).unwrap();
+fn assert_scalar_inner(input: &str, expected: &str, expected_type: DataType, extended: bool) {
+    let yason = YasonBuf::parse(input, extended).unwrap();
     match expected_type {
         DataType::String => {
             assert_eq!(yason.data_type().unwrap(), DataType::String);
@@ -23,8 +23,41 @@ fn assert_scalar(input: &str, expected: &str, expected_type: DataType) {
             assert_eq!(yason.data_type().unwrap(), DataType::Null);
             assert!(yason.is_null().unwrap());
         }
-        _ => {}
+        DataType::Tinyint => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Tinyint);
+            assert_eq!(yason.tinyint().unwrap(), i8::from_str(expected).unwrap());
+        }
+        DataType::Smallint => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Smallint);
+            assert_eq!(yason.smallint().unwrap(), i16::from_str(expected).unwrap());
+        }
+        DataType::Integer => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Integer);
+            assert_eq!(yason.integer().unwrap(), i32::from_str(expected).unwrap());
+        }
+        DataType::Bigint => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Bigint);
+            assert_eq!(yason.bigint().unwrap(), i64::from_str(expected).unwrap());
+        }
+        DataType::Float => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Float);
+            assert_eq!(yason.float().unwrap(), f32::from_str(expected).unwrap());
+        }
+        DataType::Double => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Double);
+            assert_eq!(yason.double().unwrap(), f64::from_str(expected).unwrap());
+        }
+        DataType::Object => unreachable!(),
+        DataType::Array => unreachable!(),
     }
+}
+
+fn assert_scalar(input: &str, expected: &str, expected_type: DataType) {
+    assert_scalar_inner(input, expected, expected_type, false);
+}
+
+fn assert_scalar_extended(input: &str, expected: &str, expected_type: DataType) {
+    assert_scalar_inner(input, expected, expected_type, true);
 }
 
 #[test]
@@ -60,6 +93,17 @@ fn test_scalar() {
 
     // null
     assert_scalar("null", "null", DataType::Null);
+
+    assert_scalar_extended("123", "123", DataType::Tinyint);
+    assert_scalar_extended("12345", "12345", DataType::Smallint);
+    assert_scalar_extended("1234567", "1234567", DataType::Integer);
+    assert_scalar_extended("12345678900", "12345678900", DataType::Bigint);
+    assert_scalar_extended(r#"{"$numberDecimal": "12.34567"}"#, "12.34567", DataType::Number);
+    assert_scalar_extended("123.123", "123.123", DataType::Double);
+    assert_scalar_extended(r#"{"$numberDouble": "inf"}"#, "Inf", DataType::Double);
+    assert_scalar_extended(r#"{"$numberDouble": "-infinity"}"#, "-infinity", DataType::Double);
+    assert_scalar_extended(r#"{"$numberFloat": "inf"}"#, "Inf", DataType::Float);
+    assert_scalar_extended(r#"{"$numberFloat": "-infinity"}"#, "-infinity", DataType::Float);
 }
 
 enum TestValue {
@@ -134,6 +178,12 @@ fn assert_value(value: Value, expected: &mut TestValue) {
         Value::Number(val) => assert_eq!(val, Number::from_str(expected.scalar()).unwrap()),
         Value::Bool(val) => assert_eq!(val, bool::from_str(expected.scalar()).unwrap()),
         Value::Null => assert_eq!("null", expected.scalar()),
+        Value::Tinyint(i) => assert_eq!(i, i8::from_str(expected.scalar()).unwrap()),
+        Value::Smallint(i) => assert_eq!(i, i16::from_str(expected.scalar()).unwrap()),
+        Value::Integer(i) => assert_eq!(i, i32::from_str(expected.scalar()).unwrap()),
+        Value::Bigint(i) => assert_eq!(i, i64::from_str(expected.scalar()).unwrap()),
+        Value::Float(f) => assert_eq!(f, f32::from_str(expected.scalar()).unwrap()),
+        Value::Double(f) => assert_eq!(f, f64::from_str(expected.scalar()).unwrap()),
     }
 }
 
@@ -141,7 +191,7 @@ fn assert_value(value: Value, expected: &mut TestValue) {
 fn test_array() {
     let input = r#"[]"#;
     let expected = vec![];
-    let yason = YasonBuf::parse(input).unwrap();
+    let yason = YasonBuf::parse(input, false).unwrap();
     assert_eq!(yason.data_type().unwrap(), DataType::Array);
     assert_array(yason.array().unwrap(), &mut TestValue::Array(expected));
 
@@ -158,7 +208,7 @@ fn test_array() {
         )]),
     ];
 
-    let yason = YasonBuf::parse(input).unwrap();
+    let yason = YasonBuf::parse(input, false).unwrap();
     assert_eq!(yason.data_type().unwrap(), DataType::Array);
     assert_array(yason.array().unwrap(), &mut TestValue::Array(expected));
 }
@@ -167,7 +217,7 @@ fn test_array() {
 fn test_object() {
     let input = r#"{}"#;
     let expected = vec![];
-    let yason = YasonBuf::parse(input).unwrap();
+    let yason = YasonBuf::parse(input, false).unwrap();
     assert_eq!(yason.data_type().unwrap(), DataType::Object);
     assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
 
@@ -176,7 +226,7 @@ fn test_object() {
         "key".to_string(),
         TestValue::Scalar((DataType::Number, "123".to_string())),
     )];
-    let yason = YasonBuf::parse(input).unwrap();
+    let yason = YasonBuf::parse(input, false).unwrap();
     assert_eq!(yason.data_type().unwrap(), DataType::Object);
     assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
 
@@ -218,7 +268,80 @@ fn test_object() {
         ),
     ];
 
-    let yason = YasonBuf::parse(input).unwrap();
+    let yason = YasonBuf::parse(input, false).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Object);
+    assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
+}
+
+#[test]
+fn test_extended_array() {
+    let input = r#"[
+        {"$numberByte": 123},
+        {"$numberShort": 12345},
+        {"$numberInt": 123456},
+        {"$numberLong": 123456789},
+        {"$numberDecimal": "123.456789"},
+        {"$numberFloat": "123.456"},
+        {"$numberDouble": "12.3456789"}
+    ]"#;
+    let expected = vec![
+        TestValue::Scalar((DataType::Tinyint, "123".to_string())),
+        TestValue::Scalar((DataType::Smallint, "12345".to_string())),
+        TestValue::Scalar((DataType::Integer, "123456".to_string())),
+        TestValue::Scalar((DataType::Bigint, "123456789".to_string())),
+        TestValue::Scalar((DataType::Number, "123.456789".to_string())),
+        TestValue::Scalar((DataType::Float, "123.456".to_string())),
+        TestValue::Scalar((DataType::Double, "12.3456789".to_string())),
+    ];
+
+    let yason = YasonBuf::parse(input, true).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Array);
+    assert_array(yason.array().unwrap(), &mut TestValue::Array(expected));
+}
+
+#[test]
+fn test_extended_object() {
+    let input = r#"{
+        "tinyint": {"$numberByte": 123},
+        "smallint": {"$numberShort": 12345},
+        "integer": {"$numberInt": 123456},
+        "bigint": {"$numberLong": 123456789},
+        "number": {"$numberDecimal": "123.456789"},
+        "float": {"$numberFloat": "123.456"},
+        "double": {"$numberDouble": "12.3456789"}
+    }"#;
+    let expected = vec![
+        (
+            "tinyint".to_string(),
+            TestValue::Scalar((DataType::Tinyint, "123".to_string())),
+        ),
+        (
+            "smallint".to_string(),
+            TestValue::Scalar((DataType::Smallint, "12345".to_string())),
+        ),
+        (
+            "integer".to_string(),
+            TestValue::Scalar((DataType::Integer, "123456".to_string())),
+        ),
+        (
+            "bigint".to_string(),
+            TestValue::Scalar((DataType::Bigint, "123456789".to_string())),
+        ),
+        (
+            "number".to_string(),
+            TestValue::Scalar((DataType::Number, "123.456789".to_string())),
+        ),
+        (
+            "float".to_string(),
+            TestValue::Scalar((DataType::Float, "123.456".to_string())),
+        ),
+        (
+            "double".to_string(),
+            TestValue::Scalar((DataType::Double, "12.3456789".to_string())),
+        ),
+    ];
+
+    let yason = YasonBuf::parse(input, true).unwrap();
     assert_eq!(yason.data_type().unwrap(), DataType::Object);
     assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
 }

@@ -1,5 +1,8 @@
 //! Formatter.
 
+use crate::extended::{
+    BIGINT_EXTENDED_NAME, FLOAT_EXTENDED_NAME, MAX_SAFE_BIGINT, MIN_SAFE_BIGINT, NUMBER_EXTENDED_NAME,
+};
 use crate::yason::LazyValue;
 use crate::{Array, DataType, Number, Object, Value, Yason, YasonError};
 use decimal_rs::DecimalFormatError;
@@ -48,6 +51,8 @@ impl From<YasonError> for FormatError {
 }
 
 pub trait Formatter {
+    fn extended(&self) -> bool;
+
     #[inline]
     fn format<W: fmt::Write>(&mut self, yason: &Yason, writer: &mut W) -> FormatResult<()> {
         let lazy_value = LazyValue::try_from(yason)?;
@@ -82,6 +87,30 @@ pub trait Formatter {
                 self.write_bool(bool, writer)
             }
             DataType::Null => self.write_null(writer),
+            DataType::Tinyint => {
+                let i = unsafe { value.tinyint()? };
+                self.write_tinyint(i, writer)
+            }
+            DataType::Smallint => {
+                let i = unsafe { value.smallint()? };
+                self.write_smallint(i, writer)
+            }
+            DataType::Integer => {
+                let i = unsafe { value.integer()? };
+                self.write_integer(i, writer)
+            }
+            DataType::Bigint => {
+                let i = unsafe { value.bigint()? };
+                self.write_bigint(i, writer)
+            }
+            DataType::Float => {
+                let f = unsafe { value.float()? };
+                self.write_float(f, writer)
+            }
+            DataType::Double => {
+                let f = unsafe { value.double()? };
+                self.write_double(f, writer)
+            }
         }
     }
 
@@ -99,8 +128,78 @@ pub trait Formatter {
     }
 
     #[inline]
+    fn write_tinyint<W: fmt::Write>(&mut self, value: i8, writer: &mut W) -> FormatResult<()> {
+        write!(writer, "{}", value)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_smallint<W: fmt::Write>(&mut self, value: i16, writer: &mut W) -> FormatResult<()> {
+        write!(writer, "{}", value)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_integer<W: fmt::Write>(&mut self, value: i32, writer: &mut W) -> FormatResult<()> {
+        write!(writer, "{}", value)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_bigint<W: fmt::Write>(&mut self, value: i64, writer: &mut W) -> FormatResult<()> {
+        if self.extended() {
+            if (MIN_SAFE_BIGINT..=MAX_SAFE_BIGINT).contains(&value) {
+                write!(writer, "{}", value)?;
+                Ok(())
+            } else {
+                self.write_extended_object(writer, BIGINT_EXTENDED_NAME, |w| {
+                    write!(w, "\"{}\"", value)?;
+                    Ok(())
+                })
+            }
+        } else {
+            write!(writer, "{}", value)?;
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn write_float<W: fmt::Write>(&mut self, value: f32, writer: &mut W) -> FormatResult<()> {
+        if self.extended() {
+            self.write_extended_object(writer, FLOAT_EXTENDED_NAME, |w| {
+                write!(w, "\"{}\"", value)?;
+                Ok(())
+            })
+        } else {
+            write!(writer, "{}", value)?;
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn write_double<W: fmt::Write>(&mut self, value: f64, writer: &mut W) -> FormatResult<()> {
+        write!(writer, "{}", value)?;
+        Ok(())
+    }
+
+    #[inline]
     fn write_number<W: fmt::Write>(&mut self, value: &Number, writer: &mut W) -> FormatResult<()> {
-        value.format_to_json(writer).map_err(FormatError::NumberFormatError)
+        if self.extended() {
+            if !value.has_fract() {
+                if let Ok(i) = i64::try_from(value) {
+                    return self.write_bigint(i, writer);
+                }
+            }
+
+            self.write_extended_object(writer, NUMBER_EXTENDED_NAME, |mut w| {
+                w.write_bytes(b"\"")?;
+                value.format_to_json(&mut w).map_err(FormatError::NumberFormatError)?;
+                w.write_bytes(b"\"")?;
+                Ok(())
+            })
+        } else {
+            value.format_to_json(writer).map_err(FormatError::NumberFormatError)
+        }
     }
 
     #[inline]
@@ -108,6 +207,21 @@ pub trait Formatter {
         self.begin_string(writer)?;
         format_escaped_str(value, writer)?;
         self.end_string(writer)
+    }
+
+    #[inline]
+    fn write_extended_object<W: fmt::Write, F>(&mut self, writer: &mut W, key: &str, write_value: F) -> FormatResult<()>
+    where
+        F: FnOnce(&mut W) -> FormatResult<()>,
+    {
+        self.begin_object(writer)?;
+        self.begin_object_key(true, writer)?;
+        self.write_string(key, writer)?;
+        self.end_object_key(writer)?;
+        self.begin_object_value(writer)?;
+        write_value(writer)?;
+        self.end_object_value(writer)?;
+        self.end_object(writer)
     }
 
     #[inline]
@@ -274,32 +388,50 @@ pub trait Formatter {
             Value::Number(number) => self.write_number(number, writer),
             Value::Bool(bool) => self.write_bool(*bool, writer),
             Value::Null => self.write_null(writer),
+            Value::Tinyint(i) => self.write_tinyint(*i, writer),
+            Value::Smallint(i) => self.write_smallint(*i, writer),
+            Value::Integer(i) => self.write_integer(*i, writer),
+            Value::Bigint(i) => self.write_bigint(*i, writer),
+            Value::Float(f) => self.write_float(*f, writer),
+            Value::Double(f) => self.write_double(*f, writer),
         }?;
 
         self.end_array_value(writer)
     }
 }
 
-pub struct CompactFormatter;
+pub struct CompactFormatter {
+    extended: bool,
+}
 
 impl CompactFormatter {
     #[inline]
-    pub(crate) const fn new() -> Self {
-        Self
+    pub(crate) const fn new(extended: bool) -> Self {
+        Self { extended }
     }
 }
 
-impl Formatter for CompactFormatter {}
+impl Formatter for CompactFormatter {
+    #[inline]
+    fn extended(&self) -> bool {
+        self.extended
+    }
+}
 
 pub struct LazyFormat<'a> {
     yason: &'a Yason,
     pretty: bool,
+    extended: bool,
 }
 
 impl<'a> LazyFormat<'a> {
     #[inline]
-    pub const fn new(yason: &'a Yason, pretty: bool) -> Self {
-        Self { yason, pretty }
+    pub const fn new(yason: &'a Yason, pretty: bool, extended: bool) -> Self {
+        Self {
+            yason,
+            pretty,
+            extended,
+        }
     }
 }
 
@@ -307,10 +439,10 @@ impl fmt::Display for LazyFormat<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.pretty {
-            let mut fmt = PrettyFormatter::new();
+            let mut fmt = PrettyFormatter::new(self.extended);
             fmt.format(self.yason, f).map_err(|_| fmt::Error)
         } else {
-            let mut fmt = CompactFormatter::new();
+            let mut fmt = CompactFormatter::new(self.extended);
             fmt.format(self.yason, f).map_err(|_| fmt::Error)
         }
     }
@@ -413,3 +545,15 @@ trait WriteExt: fmt::Write {
 }
 
 impl<W: fmt::Write> WriteExt for W {}
+
+macro_rules! format_to {
+    ($writer: expr, $pretty: expr, $extended: expr, $value: expr, $method: ident) => {
+        if $pretty {
+            let mut fmt = PrettyFormatter::new($extended);
+            fmt.$method($value, $writer)
+        } else {
+            let mut fmt = CompactFormatter::new($extended);
+            fmt.$method($value, $writer)
+        }
+    };
+}

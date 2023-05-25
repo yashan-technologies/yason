@@ -141,6 +141,60 @@ impl<'a> Array<'a> {
         self.read_bool(value_entry_pos)
     }
 
+    /// Gets a tinyint value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn tinyint(&self, index: usize) -> YasonResult<i8> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Tinyint)?;
+        self.read_tinyint(value_entry_pos)
+    }
+
+    /// Gets a smallint value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn smallint(&self, index: usize) -> YasonResult<i16> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Smallint)?;
+        self.read_smallint(value_entry_pos)
+    }
+
+    /// Gets a integer value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn integer(&self, index: usize) -> YasonResult<i32> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Integer)?;
+        self.read_integer(value_entry_pos)
+    }
+
+    /// Gets a bigint value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn bigint(&self, index: usize) -> YasonResult<i64> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Bigint)?;
+        self.read_bigint(value_entry_pos)
+    }
+
+    /// Gets a float value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn float(&self, index: usize) -> YasonResult<f32> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Float)?;
+        self.read_float(value_entry_pos)
+    }
+
+    /// Gets a double value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn double(&self, index: usize) -> YasonResult<f64> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Double)?;
+        self.read_double(value_entry_pos)
+    }
+
     #[inline]
     pub(crate) fn equals<T: AsRef<Array<'a>>>(&self, other: T) -> YasonResult<bool> {
         let other = other.as_ref();
@@ -213,8 +267,44 @@ impl<'a> Array<'a> {
 
     #[inline]
     pub(crate) fn read_bool(&self, value_entry_pos: usize) -> YasonResult<bool> {
-        // bool can be inlined
-        Ok(self.0.read_u8(value_entry_pos + DATA_TYPE_SIZE)? == 1)
+        // bool is inlined
+        Ok(self.0.read_u32(value_entry_pos + DATA_TYPE_SIZE)? == 1)
+    }
+
+    #[inline]
+    pub(crate) fn read_tinyint(&self, value_entry_pos: usize) -> YasonResult<i8> {
+        // tinyint is inlined
+        Ok(self.0.read_u32(value_entry_pos + DATA_TYPE_SIZE)? as i8)
+    }
+
+    #[inline]
+    pub(crate) fn read_smallint(&self, value_entry_pos: usize) -> YasonResult<i16> {
+        // smallint is inlined
+        Ok(self.0.read_u32(value_entry_pos + DATA_TYPE_SIZE)? as i16)
+    }
+
+    #[inline]
+    pub(crate) fn read_integer(&self, value_entry_pos: usize) -> YasonResult<i32> {
+        // integer is inlined
+        Ok(self.0.read_u32(value_entry_pos + DATA_TYPE_SIZE)? as i32)
+    }
+
+    #[inline]
+    pub(crate) fn read_bigint(&self, value_entry_pos: usize) -> YasonResult<i64> {
+        let value_pos = self.read_value_pos(value_entry_pos)?;
+        self.0.read_bigint(value_pos)
+    }
+
+    #[inline]
+    pub(crate) fn read_float(&self, value_entry_pos: usize) -> YasonResult<f32> {
+        // float is inlined
+        Ok(f32::from_bits(self.0.read_u32(value_entry_pos + DATA_TYPE_SIZE)?))
+    }
+
+    #[inline]
+    pub(crate) fn read_double(&self, value_entry_pos: usize) -> YasonResult<f64> {
+        let value_pos = self.read_value_pos(value_entry_pos)?;
+        self.0.read_double(value_pos)
     }
 
     #[inline]
@@ -228,6 +318,12 @@ impl<'a> Array<'a> {
             DataType::Number => Value::Number(self.read_number(value_entry_pos)?),
             DataType::Bool => Value::Bool(self.read_bool(value_entry_pos)?),
             DataType::Null => Value::Null,
+            DataType::Tinyint => Value::Tinyint(self.read_tinyint(value_entry_pos)?),
+            DataType::Smallint => Value::Smallint(self.read_smallint(value_entry_pos)?),
+            DataType::Integer => Value::Integer(self.read_integer(value_entry_pos)?),
+            DataType::Bigint => Value::Bigint(self.read_bigint(value_entry_pos)?),
+            DataType::Float => Value::Float(self.read_float(value_entry_pos)?),
+            DataType::Double => Value::Double(self.read_double(value_entry_pos)?),
         };
         Ok(value)
     }

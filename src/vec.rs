@@ -11,8 +11,13 @@ use std::mem::size_of;
 pub trait VecExt: Sized {
     fn try_with_capacity(capacity: usize) -> Result<Self, TryReserveError>;
     fn push_u8(&mut self, val: u8);
+    fn push_i8(&mut self, val: i8);
     fn push_u16(&mut self, val: u16);
+    fn push_i16(&mut self, val: i16);
     fn push_i32(&mut self, val: i32);
+    fn push_i64(&mut self, val: i64);
+    fn push_f32(&mut self, val: f32);
+    fn push_f64(&mut self, val: f64);
     fn push_data_type(&mut self, data_type: DataType);
     fn write_data_type_by_pos(&mut self, data_type: DataType, type_pos: usize);
     fn push_str(&mut self, s: &str);
@@ -45,14 +50,44 @@ impl VecExt for Vec<u8> {
     }
 
     #[inline]
+    fn push_i8(&mut self, val: i8) {
+        debug_assert!(size_of::<i8>() <= self.capacity() - self.len());
+        self.push(val as u8);
+    }
+
+    #[inline]
     fn push_u16(&mut self, val: u16) {
         debug_assert!(size_of::<u16>() <= self.capacity() - self.len());
         self.extend_from_slice(&val.to_le_bytes());
     }
 
     #[inline]
+    fn push_i16(&mut self, val: i16) {
+        debug_assert!(size_of::<i16>() <= self.capacity() - self.len());
+        self.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
     fn push_i32(&mut self, val: i32) {
         debug_assert!(size_of::<i32>() <= self.capacity() - self.len());
+        self.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    fn push_i64(&mut self, val: i64) {
+        debug_assert!(size_of::<i64>() <= self.capacity() - self.len());
+        self.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    fn push_f32(&mut self, val: f32) {
+        debug_assert!(size_of::<f32>() <= self.capacity() - self.len());
+        self.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    fn push_f64(&mut self, val: f64) {
+        debug_assert!(size_of::<f64>() <= self.capacity() - self.len());
         self.extend_from_slice(&val.to_le_bytes());
     }
 

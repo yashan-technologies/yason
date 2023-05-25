@@ -13,9 +13,18 @@ pub enum DataType {
     Number = 4,
     Bool = 5,
     Null = 6,
+    Tinyint = 7,
+    Smallint = 8,
+    Integer = 9,
+    Bigint = 10,
+    Float = 11,
+    Double = 12,
 }
 
-const DATA_TYPE_NAME: [&str; 7] = ["invalid", "object", "array", "string", "number", "boolean", "null"];
+const DATA_TYPE_NAME: [&str; 13] = [
+    "invalid", "object", "array", "string", "number", "boolean", "null", "tinyint", "smallint", "integer", "bigint",
+    "float", "double",
+];
 
 impl DataType {
     #[inline]
@@ -41,6 +50,12 @@ impl Display for DataType {
             DataType::Number => write!(f, "Number"),
             DataType::Bool => write!(f, "Bool"),
             DataType::Null => write!(f, "Null"),
+            DataType::Tinyint => write!(f, "Tinyint"),
+            DataType::Smallint => write!(f, "Smallint"),
+            DataType::Integer => write!(f, "Integer"),
+            DataType::Bigint => write!(f, "Bigint"),
+            DataType::Float => write!(f, "Float"),
+            DataType::Double => write!(f, "Double"),
         }
     }
 }
@@ -62,6 +77,12 @@ impl TryFrom<u8> for DataType {
             4 => Ok(DataType::Number),
             5 => Ok(DataType::Bool),
             6 => Ok(DataType::Null),
+            7 => Ok(DataType::Tinyint),
+            8 => Ok(DataType::Smallint),
+            9 => Ok(DataType::Integer),
+            10 => Ok(DataType::Bigint),
+            11 => Ok(DataType::Float),
+            12 => Ok(DataType::Double),
             v => Err(InvalidDataType(v)),
         }
     }

@@ -3,8 +3,8 @@
 use yason::YasonBuf;
 
 fn assert_equal(left: &str, right: &str, expected: bool) {
-    let left = YasonBuf::parse(left).unwrap();
-    let right = YasonBuf::parse(right).unwrap();
+    let left = YasonBuf::parse(left, false).unwrap();
+    let right = YasonBuf::parse(right, false).unwrap();
 
     let res = left == right;
     assert_eq!(res, expected);

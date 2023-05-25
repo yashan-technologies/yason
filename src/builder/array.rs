@@ -1,7 +1,8 @@
 //! Array builder.
 
 use crate::binary::{
-    ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, MAX_DATA_LENGTH_SIZE, NUMBER_LENGTH_SIZE, VALUE_ENTRY_SIZE,
+    ARRAY_SIZE, BIGINT_SIZE, DATA_TYPE_SIZE, DOUBLE_SIZE, ELEMENT_COUNT_SIZE, MAX_DATA_LENGTH_SIZE, NUMBER_LENGTH_SIZE,
+    VALUE_ENTRY_SIZE,
 };
 use crate::builder::object::InnerObjectBuilder;
 use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
@@ -163,6 +164,72 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
+    fn push_tinyint(&mut self, value: i8) -> BuildResult<()> {
+        // tinyint can be inlined
+        let f = |bytes: &mut Vec<u8>, _offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(value as u32, value_entry_pos + DATA_TYPE_SIZE);
+            Ok(())
+        };
+        self.push_value(DataType::Tinyint, f)
+    }
+
+    #[inline]
+    fn push_smallint(&mut self, value: i16) -> BuildResult<()> {
+        // smallint can be inlined
+        let f = |bytes: &mut Vec<u8>, _offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(value as u32, value_entry_pos + DATA_TYPE_SIZE);
+            Ok(())
+        };
+        self.push_value(DataType::Smallint, f)
+    }
+
+    #[inline]
+    fn push_integer(&mut self, value: i32) -> BuildResult<()> {
+        // integer can be inlined
+        let f = |bytes: &mut Vec<u8>, _offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(value as u32, value_entry_pos + DATA_TYPE_SIZE);
+            Ok(())
+        };
+        self.push_value(DataType::Integer, f)
+    }
+
+    #[inline]
+    fn push_bigint(&mut self, value: i64) -> BuildResult<()> {
+        let size = DATA_TYPE_SIZE + BIGINT_SIZE;
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Bigint);
+            bytes.push_i64(value);
+            Ok(())
+        };
+        self.push_value(DataType::Bigint, f)
+    }
+
+    #[inline]
+    fn push_float(&mut self, value: f32) -> BuildResult<()> {
+        // float can be inlined
+        let f = |bytes: &mut Vec<u8>, _offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(value.to_bits(), value_entry_pos + DATA_TYPE_SIZE);
+            Ok(())
+        };
+        self.push_value(DataType::Float, f)
+    }
+
+    #[inline]
+    fn push_double(&mut self, value: f64) -> BuildResult<()> {
+        let size = DATA_TYPE_SIZE + DOUBLE_SIZE;
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Double);
+            bytes.push_f64(value);
+            Ok(())
+        };
+        self.push_value(DataType::Double, f)
+    }
+
+    #[inline]
     unsafe fn push_object_or_array(&mut self, yason: &Yason, data_type: DataType) -> BuildResult<()> {
         let value = yason.as_bytes();
         let size = value.len();
@@ -244,6 +311,24 @@ pub trait ArrBuilder {
 
     /// Pushes a null value.
     fn push_null(&mut self) -> BuildResult<&mut Self>;
+
+    /// Pushes a tinyint value.
+    fn push_tinyint(&mut self, value: i8) -> BuildResult<&mut Self>;
+
+    /// Pushes a smallint value.
+    fn push_smallint(&mut self, value: i16) -> BuildResult<&mut Self>;
+
+    /// Pushes a integer value.
+    fn push_integer(&mut self, value: i32) -> BuildResult<&mut Self>;
+
+    /// Pushes a bigint value.
+    fn push_bigint(&mut self, value: i64) -> BuildResult<&mut Self>;
+
+    /// Pushes a float value.
+    fn push_float(&mut self, value: f32) -> BuildResult<&mut Self>;
+
+    /// Pushes a double value.
+    fn push_double(&mut self, value: f64) -> BuildResult<&mut Self>;
 }
 
 macro_rules! impl_push_methods {
@@ -288,6 +373,48 @@ macro_rules! impl_push_methods {
         #[inline]
         $v fn push_null(&mut self) -> BuildResult<&mut Self> {
             self.0.push_null()?;
+            Ok(self)
+        }
+
+        /// Pushes a tinyint value.
+        #[inline]
+        $v fn push_tinyint(&mut self, value: i8) -> BuildResult<&mut Self> {
+            self.0.push_tinyint(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a smallint value.
+        #[inline]
+        $v fn push_smallint(&mut self, value: i16) -> BuildResult<&mut Self> {
+            self.0.push_smallint(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a integer value.
+        #[inline]
+        $v fn push_integer(&mut self, value: i32) -> BuildResult<&mut Self> {
+            self.0.push_integer(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a bigint value.
+        #[inline]
+        $v fn push_bigint(&mut self, value: i64) -> BuildResult<&mut Self> {
+            self.0.push_bigint(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a float value.
+        #[inline]
+        $v fn push_float(&mut self, value: f32) -> BuildResult<&mut Self> {
+            self.0.push_float(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a double value.
+        #[inline]
+        $v fn push_double(&mut self, value: f64) -> BuildResult<&mut Self> {
+            self.0.push_double(value)?;
             Ok(self)
         }
     };
