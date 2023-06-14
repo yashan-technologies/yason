@@ -69,6 +69,18 @@ fn assert_eq(left: &Value, right: &Value) {
             (Value::Binary(l), Value::Binary(r)) => assert_eq!(l, r),
             _ => unreachable!(),
         },
+        DataType::Timestamp => match (left, right) {
+            (Value::Timestamp(l), Value::Timestamp(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Date => match (left, right) {
+            (Value::Date(l), Value::Date(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
+        DataType::Time => match (left, right) {
+            (Value::Time(l), Value::Time(r)) => assert_eq!(l, r),
+            _ => unreachable!(),
+        },
     }
 }
 
@@ -817,11 +829,13 @@ mod test_queried_value_format_to {
     use std::str::FromStr;
     use yason::{PathExpression, Value, Yason, YasonBuf};
 
+    #[allow(clippy::too_many_arguments)]
     fn format<'a, 'b>(
         yason: &'a Yason,
         path: &PathExpression,
         compact: &str,
         pretty: &str,
+        extended: bool,
         with_wrapper: bool,
         query_buf: Option<&'b mut Vec<Value<'a>>>,
         result_buf: Option<&'b mut Vec<u8>>,
@@ -829,11 +843,11 @@ mod test_queried_value_format_to {
         let value = path.query(yason, with_wrapper, query_buf, result_buf).unwrap();
 
         let mut res = String::new();
-        value.format_to(false, false, &mut res).unwrap();
+        value.format_to(false, extended, &mut res).unwrap();
         assert_eq!(res.as_str(), compact);
 
         res.clear();
-        value.format_to(true, false, &mut res).unwrap();
+        value.format_to(true, extended, &mut res).unwrap();
         assert_eq!(res.as_str(), pretty);
     }
 
@@ -841,21 +855,28 @@ mod test_queried_value_format_to {
         let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
-        format(yason_buf.as_ref(), &path, "", "", false, None, None);
+        format(yason_buf.as_ref(), &path, "", "", false, false, None, None);
     }
 
     fn assert_queried_value(input: &str, path: &str, compact: &str, pretty: &str) {
         let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
-        format(yason_buf.as_ref(), &path, compact, pretty, false, None, None);
+        format(yason_buf.as_ref(), &path, compact, pretty, false, false, None, None);
+    }
+
+    fn assert_queried_value_extended(input: &str, path: &str, compact: &str, pretty: &str) {
+        let yason_buf = YasonBuf::parse(input, true).unwrap();
+        let path = PathExpression::from_str(path).unwrap();
+
+        format(yason_buf.as_ref(), &path, compact, pretty, true, false, None, None);
     }
 
     fn assert_queried_values(input: &str, path: &str, compact: &str, pretty: &str) {
         let yason_buf = YasonBuf::parse(input, false).unwrap();
         let path = PathExpression::from_str(path).unwrap();
 
-        format(yason_buf.as_ref(), &path, compact, pretty, true, None, None);
+        format(yason_buf.as_ref(), &path, compact, pretty, false, true, None, None);
     }
 
     fn assert_queried_values_ref(input: &str, path: &str, compact: &str, pretty: &str) {
@@ -868,6 +889,7 @@ mod test_queried_value_format_to {
             &path,
             compact,
             pretty,
+            false,
             true,
             Some(&mut query_buf),
             None,
@@ -885,6 +907,7 @@ mod test_queried_value_format_to {
             &path,
             compact,
             pretty,
+            false,
             true,
             Some(&mut query_buf),
             Some(&mut result_buf),
@@ -924,6 +947,65 @@ mod test_queried_value_format_to {
         let compact = r#"{"key1":true,"key2":789,"key3":null}"#;
         let pretty = "{\n  \"key1\" : true,\n  \"key2\" : 789,\n  \"key3\" : null\n}";
         assert_queried_value(input, path, compact, pretty);
+    }
+
+    #[test]
+    fn test_extended_queried_value() {
+        let input = r#"{
+            "tinyint": {"$numberByte": 123},
+            "smallint": {"$numberShort": 12345},
+            "integer": {"$numberInt": 123456},
+            "bigint": {"$numberLong": 123456789},
+            "number": {"$numberDecimal": "123.456789"},
+            "float": {"$numberFloat": "123.456"},
+            "double": {"$numberDouble": "12.3456789"},
+            "binary": {"$binary": "aGVsbG8h"},
+            "ts": {"$yashanTimestamp": "9999-12-31T23:59:59.999999"},
+            "date": {"$yashanDate": "9999-12-31T23:59:59"},
+            "time": {"$yashanTime": "23:59:59.999999"}
+        }"#;
+
+        assert_queried_value_extended(input, "$.tinyint", "123", "123");
+        assert_queried_value_extended(input, "$.smallint", "12345", "12345");
+        assert_queried_value_extended(input, "$.integer", "123456", "123456");
+        assert_queried_value_extended(input, "$.integer", "123456", "123456");
+        assert_queried_value_extended(
+            input,
+            "$.number",
+            r#"{"$numberDecimal":"123.456789"}"#,
+            "{\n  \"$numberDecimal\" : \"123.456789\"\n}",
+        );
+        assert_queried_value_extended(
+            input,
+            "$.float",
+            r#"{"$numberFloat":"123.456"}"#,
+            "{\n  \"$numberFloat\" : \"123.456\"\n}",
+        );
+        assert_queried_value_extended(input, "$.double", "12.3456789", "12.3456789");
+        assert_queried_value_extended(
+            input,
+            "$.binary",
+            r#"{"$binary":"aGVsbG8h"}"#,
+            "{\n  \"$binary\" : \"aGVsbG8h\"\n}",
+        );
+        assert_queried_value_extended(
+            input,
+            "$.ts",
+            r#"{"$yashanTimestamp":"9999-12-31T23:59:59.999999"}"#,
+            "{\n  \"$yashanTimestamp\" : \"9999-12-31T23:59:59.999999\"\n}",
+        );
+        assert_queried_value_extended(
+            input,
+            "$.date",
+            r#"{"$yashanDate":"9999-12-31T23:59:59"}"#,
+            "{\n  \"$yashanDate\" : \"9999-12-31T23:59:59\"\n}",
+        );
+        assert_queried_value_extended(
+            input,
+            "$.time",
+            r#"{"$yashanTime":"23:59:59.999999"}"#,
+            "{\n  \"$yashanTime\" : \"23:59:59.999999\"\n}",
+        );
     }
 
     #[test]

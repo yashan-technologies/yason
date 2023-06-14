@@ -2,7 +2,7 @@
 
 use std::cmp::Ordering;
 use std::str::FromStr;
-use yason::{Array, DataType, Number, Object, Value, YasonBuf};
+use yason::{Array, DataType, Date, Number, Object, Time, Timestamp, Value, YasonBuf};
 
 fn assert_scalar_inner(input: &str, expected: &str, expected_type: DataType, extended: bool) {
     let yason = YasonBuf::parse(input, extended).unwrap();
@@ -50,6 +50,24 @@ fn assert_scalar_inner(input: &str, expected: &str, expected_type: DataType, ext
         DataType::Binary => {
             assert_eq!(yason.data_type().unwrap(), DataType::Binary);
             assert_eq!(yason.binary().unwrap(), expected.as_bytes());
+        }
+        DataType::Timestamp => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Timestamp);
+            assert_eq!(
+                yason.timestamp().unwrap(),
+                Timestamp::parse(expected, "YYYY-MM-DDTHH24:MI:SS.FF").unwrap()
+            );
+        }
+        DataType::Date => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Date);
+            assert_eq!(
+                yason.date().unwrap(),
+                Date::parse(expected, "YYYY-MM-DDTHH24:MI:SS.FF").unwrap()
+            );
+        }
+        DataType::Time => {
+            assert_eq!(yason.data_type().unwrap(), DataType::Time);
+            assert_eq!(yason.time().unwrap(), Time::parse(expected, "THH24:MI:SS.FF").unwrap());
         }
         DataType::Object => unreachable!(),
         DataType::Array => unreachable!(),
@@ -115,41 +133,166 @@ fn test_scalar() {
         "JavaScript",
         DataType::Binary,
     );
+    assert_scalar_extended(
+        r#"{"$yashanTimestamp": "2023-05-25T16:50:20.123"}"#,
+        "2023-05-25T16:50:20.123000",
+        DataType::Timestamp,
+    );
+    assert_scalar_extended(
+        r#"{"$yashanDate": "2023-05-25T16:50:20"}"#,
+        "2023-05-25T16:50:20",
+        DataType::Date,
+    );
+    assert_scalar_extended(r#"{"$yashanTime": "16:50:20"}"#, "16:50:20", DataType::Time);
 }
 
 enum TestValue {
-    Scalar((DataType, String)),
     Object(Vec<(String, TestValue)>),
     Array(Vec<TestValue>),
+    Number(Number),
+    String(String),
+    Bool(bool),
+    Null,
+    Tinyint(i8),
+    Smallint(i16),
+    Integer(i32),
+    Bigint(i64),
+    Float(f32),
+    Double(f64),
+    Binary(Vec<u8>),
+    Timestamp(Timestamp),
+    Date(Date),
+    Time(Time),
 }
 
 impl TestValue {
-    fn scalar(&self) -> &str {
-        match self {
-            TestValue::Scalar((_, str)) => str.as_str(),
-            _ => unreachable!(),
-        }
-    }
-
     fn object(&mut self) -> &mut [(String, TestValue)] {
         match self {
             TestValue::Object(object) => object.as_mut(),
-            _ => unreachable!(),
+            _ => panic!(),
         }
     }
 
     fn array(&mut self) -> &mut [TestValue] {
         match self {
             TestValue::Array(array) => array.as_mut(),
-            _ => unreachable!(),
+            _ => panic!(),
+        }
+    }
+
+    fn number(&self) -> Number {
+        match self {
+            TestValue::Number(n) => *n,
+            _ => panic!(),
+        }
+    }
+
+    fn string(&self) -> &str {
+        match self {
+            TestValue::String(str) => str,
+            _ => panic!(),
+        }
+    }
+
+    fn bool(&self) -> bool {
+        match self {
+            TestValue::Bool(b) => *b,
+            _ => panic!(),
+        }
+    }
+
+    fn is_null(&self) -> bool {
+        matches!(self, TestValue::Null)
+    }
+
+    fn tinyint(&self) -> i8 {
+        match self {
+            TestValue::Tinyint(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    fn smallint(&self) -> i16 {
+        match self {
+            TestValue::Smallint(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    fn integer(&self) -> i32 {
+        match self {
+            TestValue::Integer(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    fn bigint(&self) -> i64 {
+        match self {
+            TestValue::Bigint(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    fn float(&self) -> f32 {
+        match self {
+            TestValue::Float(f) => *f,
+            _ => panic!(),
+        }
+    }
+
+    fn double(&self) -> f64 {
+        match self {
+            TestValue::Double(f) => *f,
+            _ => panic!(),
+        }
+    }
+
+    fn binary(&self) -> &[u8] {
+        match self {
+            TestValue::Binary(bin) => bin,
+            _ => panic!(),
+        }
+    }
+
+    fn timestamp(&self) -> Timestamp {
+        match self {
+            TestValue::Timestamp(t) => *t,
+            _ => panic!(),
+        }
+    }
+
+    fn date(&self) -> Date {
+        match self {
+            TestValue::Date(t) => *t,
+            _ => panic!(),
+        }
+    }
+
+    fn time(&self) -> Time {
+        match self {
+            TestValue::Time(t) => *t,
+            _ => panic!(),
         }
     }
 
     fn data_type(&self) -> DataType {
         match self {
-            TestValue::Scalar((ty, _)) => *ty,
             TestValue::Object(_) => DataType::Object,
             TestValue::Array(_) => DataType::Array,
+            TestValue::Number(_) => DataType::Number,
+            TestValue::String(_) => DataType::String,
+            TestValue::Bool(_) => DataType::Bool,
+            TestValue::Null => DataType::Null,
+            TestValue::Tinyint(_) => DataType::Tinyint,
+            TestValue::Smallint(_) => DataType::Smallint,
+            TestValue::Integer(_) => DataType::Integer,
+            TestValue::Bigint(_) => DataType::Bigint,
+            TestValue::Float(_) => DataType::Float,
+            TestValue::Double(_) => DataType::Double,
+            TestValue::Binary(_) => DataType::Binary,
+            TestValue::Timestamp(_) => DataType::Timestamp,
+            TestValue::Date(_) => DataType::Date,
+            TestValue::Time(_) => DataType::Time,
         }
     }
 }
@@ -185,17 +328,20 @@ fn assert_value(value: Value, expected: &mut TestValue) {
     match value {
         Value::Object(obj) => assert_object(obj, expected),
         Value::Array(arr) => assert_array(arr, expected),
-        Value::String(val) => assert_eq!(val, expected.scalar()),
-        Value::Number(val) => assert_eq!(val, Number::from_str(expected.scalar()).unwrap()),
-        Value::Bool(val) => assert_eq!(val, bool::from_str(expected.scalar()).unwrap()),
-        Value::Null => assert_eq!("null", expected.scalar()),
-        Value::Tinyint(i) => assert_eq!(i, i8::from_str(expected.scalar()).unwrap()),
-        Value::Smallint(i) => assert_eq!(i, i16::from_str(expected.scalar()).unwrap()),
-        Value::Integer(i) => assert_eq!(i, i32::from_str(expected.scalar()).unwrap()),
-        Value::Bigint(i) => assert_eq!(i, i64::from_str(expected.scalar()).unwrap()),
-        Value::Float(f) => assert_eq!(f, f32::from_str(expected.scalar()).unwrap()),
-        Value::Double(f) => assert_eq!(f, f64::from_str(expected.scalar()).unwrap()),
-        Value::Binary(bin) => assert_eq!(bin, expected.scalar().as_bytes()),
+        Value::String(val) => assert_eq!(val, expected.string()),
+        Value::Number(val) => assert_eq!(val, expected.number()),
+        Value::Bool(val) => assert_eq!(val, expected.bool()),
+        Value::Null => assert!(expected.is_null()),
+        Value::Tinyint(i) => assert_eq!(i, expected.tinyint()),
+        Value::Smallint(i) => assert_eq!(i, expected.smallint()),
+        Value::Integer(i) => assert_eq!(i, expected.integer()),
+        Value::Bigint(i) => assert_eq!(i, expected.bigint()),
+        Value::Float(f) => assert_eq!(f, expected.float()),
+        Value::Double(f) => assert_eq!(f, expected.double()),
+        Value::Binary(bin) => assert_eq!(bin, expected.binary()),
+        Value::Timestamp(t) => assert_eq!(t, expected.timestamp()),
+        Value::Date(t) => assert_eq!(t, expected.date()),
+        Value::Time(t) => assert_eq!(t, expected.time()),
     }
 }
 
@@ -207,17 +353,14 @@ fn test_array() {
     assert_eq!(yason.data_type().unwrap(), DataType::Array);
     assert_array(yason.array().unwrap(), &mut TestValue::Array(expected));
 
-    let input = r#"["John Doe", 43, true, null, [2345678], {"key": true}]"#;
+    let input = r#"["John Doe", 43, true, null,[2345678], {"key": true}]"#;
     let expected = vec![
-        TestValue::Scalar((DataType::String, "John Doe".to_string())),
-        TestValue::Scalar((DataType::Number, "43".to_string())),
-        TestValue::Scalar((DataType::Bool, "true".to_string())),
-        TestValue::Scalar((DataType::Null, "null".to_string())),
-        TestValue::Array(vec![TestValue::Scalar((DataType::Number, "2345678".to_string()))]),
-        TestValue::Object(vec![(
-            "key".to_string(),
-            TestValue::Scalar((DataType::Bool, "true".to_string())),
-        )]),
+        TestValue::String("John Doe".to_string()),
+        TestValue::Number("43".parse().unwrap()),
+        TestValue::Bool(true),
+        TestValue::Null,
+        TestValue::Array(vec![TestValue::Number("2345678".parse().unwrap())]),
+        TestValue::Object(vec![("key".to_string(), TestValue::Bool(true))]),
     ];
 
     let yason = YasonBuf::parse(input, false).unwrap();
@@ -234,10 +377,7 @@ fn test_object() {
     assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
 
     let input = r#"{"key": 123}"#;
-    let expected = vec![(
-        "key".to_string(),
-        TestValue::Scalar((DataType::Number, "123".to_string())),
-    )];
+    let expected = vec![("key".to_string(), TestValue::Number("123".parse().unwrap()))];
     let yason = YasonBuf::parse(input, false).unwrap();
     assert_eq!(yason.data_type().unwrap(), DataType::Object);
     assert_object(yason.object().unwrap(), &mut TestValue::Object(expected));
@@ -251,32 +391,17 @@ fn test_object() {
         "object": {"key": true}
     }"#;
     let expected = vec![
-        (
-            "name".to_string(),
-            TestValue::Scalar((DataType::String, "John Doe".to_string())),
-        ),
-        (
-            "age".to_string(),
-            TestValue::Scalar((DataType::Number, "43".to_string())),
-        ),
-        (
-            "bool".to_string(),
-            TestValue::Scalar((DataType::Bool, "true".to_string())),
-        ),
-        (
-            "null".to_string(),
-            TestValue::Scalar((DataType::Null, "null".to_string())),
-        ),
+        ("name".to_string(), TestValue::String("John Doe".to_string())),
+        ("age".to_string(), TestValue::Number("43".parse().unwrap())),
+        ("bool".to_string(), TestValue::Bool(true)),
+        ("null".to_string(), TestValue::Null),
         (
             "phone".to_string(),
-            TestValue::Array(vec![TestValue::Scalar((DataType::Number, "2345678".to_string()))]),
+            TestValue::Array(vec![TestValue::Number("2345678".parse().unwrap())]),
         ),
         (
             "object".to_string(),
-            TestValue::Object(vec![(
-                "key".to_string(),
-                TestValue::Scalar((DataType::Bool, "true".to_string())),
-            )]),
+            TestValue::Object(vec![("key".to_string(), TestValue::Bool(true))]),
         ),
     ];
 
@@ -295,17 +420,23 @@ fn test_extended_array() {
         {"$numberDecimal": "123.456789"},
         {"$numberFloat": "123.456"},
         {"$numberDouble": "12.3456789"},
-        {"$binary": "aGVsbG8h"}
+        {"$binary": "aGVsbG8h"},
+        {"$yashanTimestamp": "9999-12-31T23:59:59.999999"},
+        {"$yashanDate": "9999-12-31T23:59:59"},
+        {"$yashanTime": "23:59:59.999999"}
     ]"#;
     let expected = vec![
-        TestValue::Scalar((DataType::Tinyint, "123".to_string())),
-        TestValue::Scalar((DataType::Smallint, "12345".to_string())),
-        TestValue::Scalar((DataType::Integer, "123456".to_string())),
-        TestValue::Scalar((DataType::Bigint, "123456789".to_string())),
-        TestValue::Scalar((DataType::Number, "123.456789".to_string())),
-        TestValue::Scalar((DataType::Float, "123.456".to_string())),
-        TestValue::Scalar((DataType::Double, "12.3456789".to_string())),
-        TestValue::Scalar((DataType::Binary, "hello!".to_string())),
+        TestValue::Tinyint(123),
+        TestValue::Smallint(12345),
+        TestValue::Integer(123456),
+        TestValue::Bigint(123456789),
+        TestValue::Number("123.456789".parse().unwrap()),
+        TestValue::Float("123.456".parse().unwrap()),
+        TestValue::Double("12.3456789".parse().unwrap()),
+        TestValue::Binary(Vec::from(b"hello!".as_slice())),
+        TestValue::Timestamp(Timestamp::MAX),
+        TestValue::Date(Date::MAX),
+        TestValue::Time(Time::MAX),
     ];
 
     let yason = YasonBuf::parse(input, true).unwrap();
@@ -323,41 +454,24 @@ fn test_extended_object() {
         "number": {"$numberDecimal": "123.456789"},
         "float": {"$numberFloat": "123.456"},
         "double": {"$numberDouble": "12.3456789"},
-        "binary": {"$binary": "aGVsbG8h"}
+        "binary": {"$binary": "aGVsbG8h"},
+        "ts": {"$yashanTimestamp": "9999-12-31T23:59:59.999999"},
+        "date": {"$yashanDate": "9999-12-31T23:59:59"},
+        "time": {"$yashanTime": "23:59:59.999999"}
     }"#;
+
     let expected = vec![
-        (
-            "tinyint".to_string(),
-            TestValue::Scalar((DataType::Tinyint, "123".to_string())),
-        ),
-        (
-            "smallint".to_string(),
-            TestValue::Scalar((DataType::Smallint, "12345".to_string())),
-        ),
-        (
-            "integer".to_string(),
-            TestValue::Scalar((DataType::Integer, "123456".to_string())),
-        ),
-        (
-            "bigint".to_string(),
-            TestValue::Scalar((DataType::Bigint, "123456789".to_string())),
-        ),
-        (
-            "number".to_string(),
-            TestValue::Scalar((DataType::Number, "123.456789".to_string())),
-        ),
-        (
-            "float".to_string(),
-            TestValue::Scalar((DataType::Float, "123.456".to_string())),
-        ),
-        (
-            "double".to_string(),
-            TestValue::Scalar((DataType::Double, "12.3456789".to_string())),
-        ),
-        (
-            "binary".to_string(),
-            TestValue::Scalar((DataType::Binary, "hello!".to_string())),
-        ),
+        ("tinyint".to_string(), TestValue::Tinyint(123)),
+        ("smallint".to_string(), TestValue::Smallint(12345)),
+        ("integer".to_string(), TestValue::Integer(123456)),
+        ("bigint".to_string(), TestValue::Bigint(123456789)),
+        ("number".to_string(), TestValue::Number("123.456789".parse().unwrap())),
+        ("float".to_string(), TestValue::Float("123.456".parse().unwrap())),
+        ("double".to_string(), TestValue::Double("12.3456789".parse().unwrap())),
+        ("binary".to_string(), TestValue::Binary(Vec::from(b"hello!".as_slice()))),
+        ("ts".to_string(), TestValue::Timestamp(Timestamp::MAX)),
+        ("date".to_string(), TestValue::Date(Date::MAX)),
+        ("time".to_string(), TestValue::Time(Time::MAX)),
     ];
 
     let yason = YasonBuf::parse(input, true).unwrap();

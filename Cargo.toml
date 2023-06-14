@@ -14,6 +14,7 @@ documentation = "https://docs.rs/yason/"
 
 [dependencies]
 decimal-rs = "0.1.44"
+sqldatetime = { version = "0.1.36", features = ["oracle"] }
 serde = { version = "1.0.138", optional = true }
 
 [dev-dependencies]

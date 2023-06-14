@@ -3,7 +3,7 @@
 use crate::binary::{KEY_OFFSET_SIZE, MAX_STRING_SIZE, NUMBER_LENGTH_SIZE, OBJECT_SIZE, VALUE_ENTRY_SIZE};
 use crate::builder::BuildResult;
 use crate::util::encode_varint;
-use crate::{BuildError, DataType, Number};
+use crate::{BuildError, DataType, Date, Number, Time, Timestamp};
 use std::collections::TryReserveError;
 use std::mem::size_of;
 
@@ -32,6 +32,9 @@ pub trait VecExt: Sized {
     fn push_binary_length(&mut self, length: usize) -> BuildResult<()>;
     fn push_binary(&mut self, s: &[u8]) -> BuildResult<()>;
     fn push_number(&mut self, value: &Number);
+    fn push_timestamp(&mut self, val: Timestamp);
+    fn push_date(&mut self, val: Date);
+    fn push_time(&mut self, val: Time);
     fn try_extend_from_slice(&mut self, other: &[u8]) -> Result<(), TryReserveError>;
     fn try_push(&mut self, val: u8) -> Result<(), TryReserveError>;
 }
@@ -211,6 +214,21 @@ impl VecExt for Vec<u8> {
         unsafe {
             self.set_len(value_pos + size);
         }
+    }
+
+    #[inline]
+    fn push_timestamp(&mut self, val: Timestamp) {
+        self.push_i64(val.usecs());
+    }
+
+    #[inline]
+    fn push_date(&mut self, val: Date) {
+        self.push_i64(val.usecs());
+    }
+
+    #[inline]
+    fn push_time(&mut self, val: Time) {
+        self.push_i64(val.usecs());
     }
 
     #[inline]

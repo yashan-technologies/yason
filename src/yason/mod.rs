@@ -6,10 +6,10 @@ mod object;
 pub use crate::yason::array::{Array, ArrayIter};
 pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 
-use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, NUMBER_LENGTH_SIZE, OBJECT_SIZE};
+use crate::binary::*;
 use crate::format::{CompactFormatter, FormatResult, Formatter, LazyFormat, PrettyFormatter};
 use crate::util::{decode_varint, slice_to_array};
-use crate::{BuildError, DataType, Number, Scalar};
+use crate::{BuildError, DataType, Date, Number, Scalar, Time, Timestamp};
 use std::borrow::Borrow;
 use std::collections::TryReserveError;
 use std::error::Error;
@@ -328,6 +328,45 @@ impl Yason {
         self.read_double(0)
     }
 
+    /// If `Yason` is `Timestamp`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn timestamp(&self) -> YasonResult<Timestamp> {
+        self.check_type(0, DataType::Timestamp)?;
+        unsafe { self.timestamp_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn timestamp_unchecked(&self) -> YasonResult<Timestamp> {
+        debug_assert!(self.data_type()? == DataType::Timestamp);
+        self.read_timestamp(0)
+    }
+
+    /// If `Yason` is `Date`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn date(&self) -> YasonResult<Date> {
+        self.check_type(0, DataType::Date)?;
+        unsafe { self.date_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn date_unchecked(&self) -> YasonResult<Date> {
+        debug_assert!(self.data_type()? == DataType::Date);
+        self.read_date(0)
+    }
+
+    /// If `Yason` is `Time`, return its value. Returns `YasonError` otherwise.
+    #[inline]
+    pub fn time(&self) -> YasonResult<Time> {
+        self.check_type(0, DataType::Time)?;
+        unsafe { self.time_unchecked() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn time_unchecked(&self) -> YasonResult<Time> {
+        debug_assert!(self.data_type()? == DataType::Time);
+        self.read_time(0)
+    }
+
     /// Formats the yason as a compact or pretty string.
     #[inline]
     pub fn format(&self, pretty: bool, extended: bool) -> impl Display + '_ {
@@ -509,6 +548,33 @@ impl Yason {
     }
 
     #[inline]
+    fn read_timestamp(&self, index: usize) -> YasonResult<Timestamp> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + TIMESTAMP_SIZE;
+        let bytes = self.slice(index, end)?;
+        let val = i64::from_le_bytes(slice_to_array(bytes));
+        Ok(unsafe { Timestamp::from_usecs_unchecked(val) })
+    }
+
+    #[inline]
+    fn read_date(&self, index: usize) -> YasonResult<Date> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + DATE_SIZE;
+        let bytes = self.slice(index, end)?;
+        let val = i64::from_le_bytes(slice_to_array(bytes));
+        Ok(unsafe { Date::from_usecs_unchecked(val) })
+    }
+
+    #[inline]
+    fn read_time(&self, index: usize) -> YasonResult<Time> {
+        let index = index + DATA_TYPE_SIZE;
+        let end = index + TIME_SIZE;
+        let bytes = self.slice(index, end)?;
+        let val = i64::from_le_bytes(slice_to_array(bytes));
+        Ok(unsafe { Time::from_usecs_unchecked(val) })
+    }
+
+    #[inline]
     fn check_type(&self, index: usize, expected: DataType) -> YasonResult<()> {
         if !self.is_type(index, expected as u8)? {
             return Err(YasonError::UnexpectedType {
@@ -553,6 +619,9 @@ pub enum Value<'a> {
     Float(f32),
     Double(f64),
     Binary(&'a [u8]),
+    Timestamp(Timestamp),
+    Date(Date),
+    Time(Time),
 }
 
 impl<'a> Value<'a> {
@@ -572,6 +641,9 @@ impl<'a> Value<'a> {
             Value::Float(_) => DataType::Float,
             Value::Double(_) => DataType::Double,
             Value::Binary(_) => DataType::Binary,
+            Value::Timestamp(_) => DataType::Timestamp,
+            Value::Date(_) => DataType::Date,
+            Value::Time(_) => DataType::Time,
         }
     }
 
@@ -591,6 +663,9 @@ impl<'a> Value<'a> {
             Value::Float(f) => Ok(Scalar::float_with_vec(*f, buf)?),
             Value::Double(f) => Ok(Scalar::double_with_vec(*f, buf)?),
             Value::Binary(bin) => Ok(Scalar::binary_with_vec(bin, buf)?),
+            Value::Timestamp(t) => Ok(Scalar::timestamp_with_vec(*t, buf)?),
+            Value::Date(t) => Ok(Scalar::date_with_vec(*t, buf)?),
+            Value::Time(t) => Ok(Scalar::time_with_vec(*t, buf)?),
         }
     }
 
@@ -646,6 +721,15 @@ impl<'a> Value<'a> {
             Value::Binary(bin) => {
                 format_to!(writer, pretty, extended, bin, write_binary)
             }
+            Value::Timestamp(t) => {
+                format_to!(writer, pretty, extended, *t, write_timestamp)
+            }
+            Value::Date(t) => {
+                format_to!(writer, pretty, extended, *t, write_date)
+            }
+            Value::Time(t) => {
+                format_to!(writer, pretty, extended, *t, write_time)
+            }
         }
     }
 }
@@ -669,6 +753,9 @@ impl<'a> TryFrom<&'a Yason> for Value<'a> {
             DataType::Float => Ok(Value::Float(unsafe { yason.float_unchecked()? })),
             DataType::Double => Ok(Value::Double(unsafe { yason.double_unchecked()? })),
             DataType::Binary => Ok(Value::Binary(unsafe { yason.binary_unchecked()? })),
+            DataType::Timestamp => Ok(Value::Timestamp(unsafe { yason.timestamp_unchecked()? })),
+            DataType::Date => Ok(Value::Date(unsafe { yason.date_unchecked()? })),
+            DataType::Time => Ok(Value::Time(unsafe { yason.time_unchecked()? })),
         }
     }
 }
@@ -712,6 +799,9 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
                 DataType::Float => Value::Float(self.float()?),
                 DataType::Double => Value::Double(self.double()?),
                 DataType::Binary => Value::Binary(self.binary()?),
+                DataType::Timestamp => Value::Timestamp(self.timestamp()?),
+                DataType::Date => Value::Date(self.date()?),
+                DataType::Time => Value::Time(self.time()?),
             }
         };
 
@@ -839,6 +929,36 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     }
 
     #[inline]
+    pub unsafe fn timestamp(&self) -> YasonResult<Timestamp> {
+        debug_assert!(self.ty == DataType::Timestamp);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_timestamp(self.value_pos)
+        } else {
+            self.yason.read_timestamp(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn date(&self) -> YasonResult<Date> {
+        debug_assert!(self.ty == DataType::Date);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_date(self.value_pos)
+        } else {
+            self.yason.read_date(self.value_pos)
+        }
+    }
+
+    #[inline]
+    pub unsafe fn time(&self) -> YasonResult<Time> {
+        debug_assert!(self.ty == DataType::Time);
+        if IN_ARRAY {
+            Array::new_unchecked(self.yason).read_time(self.value_pos)
+        } else {
+            self.yason.read_time(self.value_pos)
+        }
+    }
+
+    #[inline]
     pub fn equals(&self, other: LazyValue<IN_ARRAY>) -> YasonResult<bool> {
         if self.data_type() != other.data_type() || self.yason.bytes.len() != other.yason.bytes.len() {
             return Ok(false);
@@ -858,6 +978,9 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
             DataType::Float => unsafe { Ok(self.float()?.eq(&other.float()?)) },
             DataType::Double => unsafe { Ok(self.double()?.eq(&other.double()?)) },
             DataType::Binary => unsafe { Ok(self.binary()?.eq(other.binary()?)) },
+            DataType::Timestamp => unsafe { Ok(self.timestamp()?.eq(&other.timestamp()?)) },
+            DataType::Date => unsafe { Ok(self.date()?.eq(&other.date()?)) },
+            DataType::Time => unsafe { Ok(self.time()?.eq(&other.time()?)) },
         }
     }
 }

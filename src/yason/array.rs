@@ -3,7 +3,7 @@
 use crate::binary::{ARRAY_SIZE, DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, VALUE_ENTRY_SIZE};
 use crate::yason::object::Object;
 use crate::yason::{LazyValue, Value, Yason, YasonError, YasonResult};
-use crate::{DataType, Number};
+use crate::{DataType, Date, Number, Time, Timestamp};
 
 /// An array in yason binary format.
 #[derive(Clone, Debug)]
@@ -204,6 +204,33 @@ impl<'a> Array<'a> {
         self.read_double(value_entry_pos)
     }
 
+    /// Gets a timestamp value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn timestamp(&self, index: usize) -> YasonResult<Timestamp> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Timestamp)?;
+        self.read_timestamp(value_entry_pos)
+    }
+
+    /// Gets a date value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn date(&self, index: usize) -> YasonResult<Date> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Date)?;
+        self.read_date(value_entry_pos)
+    }
+
+    /// Gets a time value if the element at the given index has the correct type, returns `YasonError` otherwise.
+    #[inline]
+    pub fn time(&self, index: usize) -> YasonResult<Time> {
+        self.check_index(index)?;
+        let value_entry_pos = DATA_TYPE_SIZE + ARRAY_SIZE + ELEMENT_COUNT_SIZE + index * VALUE_ENTRY_SIZE;
+        self.0.check_type(value_entry_pos, DataType::Time)?;
+        self.read_time(value_entry_pos)
+    }
+
     #[inline]
     pub(crate) fn equals<T: AsRef<Array<'a>>>(&self, other: T) -> YasonResult<bool> {
         let other = other.as_ref();
@@ -323,6 +350,24 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
+    pub(crate) fn read_timestamp(&self, value_entry_pos: usize) -> YasonResult<Timestamp> {
+        let value_pos = self.read_value_pos(value_entry_pos)?;
+        self.0.read_timestamp(value_pos)
+    }
+
+    #[inline]
+    pub(crate) fn read_date(&self, value_entry_pos: usize) -> YasonResult<Date> {
+        let value_pos = self.read_value_pos(value_entry_pos)?;
+        self.0.read_date(value_pos)
+    }
+
+    #[inline]
+    pub(crate) fn read_time(&self, value_entry_pos: usize) -> YasonResult<Time> {
+        let value_pos = self.read_value_pos(value_entry_pos)?;
+        self.0.read_time(value_pos)
+    }
+
+    #[inline]
     fn read_value(&self, index: usize) -> YasonResult<Value<'a>> {
         let (data_type, value_entry_pos) = unsafe { self.read_type_and_value_entry_pos(index)? };
 
@@ -340,6 +385,9 @@ impl<'a> Array<'a> {
             DataType::Float => Value::Float(self.read_float(value_entry_pos)?),
             DataType::Double => Value::Double(self.read_double(value_entry_pos)?),
             DataType::Binary => Value::Binary(self.read_binary(value_entry_pos)?),
+            DataType::Timestamp => Value::Timestamp(self.read_timestamp(value_entry_pos)?),
+            DataType::Date => Value::Date(self.read_date(value_entry_pos)?),
+            DataType::Time => Value::Time(self.read_time(value_entry_pos)?),
         };
         Ok(value)
     }

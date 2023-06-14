@@ -3,7 +3,7 @@
 use crate::binary::{DATA_TYPE_SIZE, ELEMENT_COUNT_SIZE, KEY_LENGTH_SIZE, KEY_OFFSET_SIZE, OBJECT_SIZE};
 use crate::yason::array::Array;
 use crate::yason::{LazyValue, Value, Yason, YasonResult};
-use crate::{DataType, Number};
+use crate::{DataType, Date, Number, Time, Timestamp};
 
 /// An object in yason binary format.
 #[derive(Clone, Debug)]
@@ -268,6 +268,42 @@ impl<'a> Object<'a> {
         Ok(None)
     }
 
+    /// Gets a timestamp for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn timestamp<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Timestamp>> {
+        let found = self.check_key(key.as_ref(), DataType::Timestamp)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_timestamp(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a date for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn date<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Date>> {
+        let found = self.check_key(key.as_ref(), DataType::Date)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_date(value_pos)?));
+        }
+        Ok(None)
+    }
+
+    /// Gets a time for this key if it exists and has the correct type, returns `None` if
+    /// this key does not exist, returns `YasonError` otherwise.
+    #[inline]
+    pub fn time<T: AsRef<str>>(&self, key: T) -> YasonResult<Option<Time>> {
+        let found = self.check_key(key.as_ref(), DataType::Time)?;
+
+        if let Some(value_pos) = found {
+            return Ok(Some(self.0.read_time(value_pos)?));
+        }
+        Ok(None)
+    }
+
     #[inline]
     pub(crate) fn equals<T: AsRef<Object<'a>>>(&self, other: T) -> YasonResult<bool> {
         let other = other.as_ref();
@@ -332,6 +368,9 @@ impl<'a> Object<'a> {
             DataType::Float => Value::Float(self.0.read_float(value_pos)?),
             DataType::Double => Value::Double(self.0.read_double(value_pos)?),
             DataType::Binary => Value::Binary(self.0.read_binary(value_pos)?),
+            DataType::Timestamp => Value::Timestamp(self.0.read_timestamp(value_pos)?),
+            DataType::Date => Value::Date(self.0.read_date(value_pos)?),
+            DataType::Time => Value::Time(self.0.read_time(value_pos)?),
         };
         Ok(value)
     }

@@ -9,7 +9,7 @@ mod value;
 pub use error::JsonParseError;
 
 use crate::builder::{ArrBuilder, BuildResult, NumberError, ObjBuilder};
-use crate::extended::{BINARY_BASE64_NAME, BINARY_SUBTYPE_NAME, EXTENDED_NAME_TYPES};
+use crate::extended::*;
 use crate::vec::VecExt;
 use crate::{ArrayRefBuilder, BuildError, DataType, Number, ObjectRefBuilder, Scalar, Yason, YasonBuf};
 use decimal_rs::DecimalParseError;
@@ -217,9 +217,24 @@ fn write_extended_object_as_scalar(bytes: &mut Vec<u8>, object: &Map<Cow<str>, V
         };
     }
 
+    macro_rules! create_temporal_scalar {
+        ($value: expr, $fmt: ident, $method: ident) => {
+            if let Value::String(str) = $value {
+                if let Ok(t) = $fmt().parse(str) {
+                    let _ = Scalar::$method(t, bytes)?;
+                    return Ok(true);
+                }
+            }
+        };
+    }
+
     // SAFETY: object has one entry.
     let (key, value) = object.iter().next().unwrap();
-    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(key)) {
+    let key_str = key.as_ref();
+    if key_str.as_bytes().first() != Some(&EXTENDED_NAME_PREFIX) {
+        return Ok(false);
+    }
+    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(key_str)) {
         let data_type = EXTENDED_NAME_TYPES[index].1;
         match data_type {
             DataType::Object => unreachable!(),
@@ -255,6 +270,15 @@ fn write_extended_object_as_scalar(bytes: &mut Vec<u8>, object: &Map<Cow<str>, V
                 })?;
                 return Ok(ret);
             }
+            DataType::Timestamp => {
+                create_temporal_scalar!(value, timestamp_formatter, timestamp_with_vec)
+            }
+            DataType::Date => {
+                create_temporal_scalar!(value, date_formatter, date_with_vec)
+            }
+            DataType::Time => {
+                create_temporal_scalar!(value, time_formatter, time_with_vec)
+            }
         }
     }
 
@@ -288,9 +312,24 @@ fn write_extended_object_to_object<T: ObjBuilder>(
         };
     }
 
+    macro_rules! push_extended_temporal {
+        ($key: expr, $value: expr, $builder: expr, $fmt: ident, $method: ident) => {
+            if let Value::String(str) = $value {
+                if let Ok(t) = $fmt().parse(str) {
+                    $builder.$method($key, t)?;
+                    return Ok(true);
+                }
+            }
+        };
+    }
+
     // SAFETY: object has one entry.
     let (obj_key, value) = object.iter().next().unwrap();
-    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(obj_key)) {
+    let key_str = obj_key.as_ref();
+    if key_str.as_bytes().first() != Some(&EXTENDED_NAME_PREFIX) {
+        return Ok(false);
+    }
+    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(key_str)) {
         let data_type = EXTENDED_NAME_TYPES[index].1;
         match data_type {
             DataType::Object => unreachable!(),
@@ -326,6 +365,15 @@ fn write_extended_object_to_object<T: ObjBuilder>(
                 })?;
                 return Ok(ret);
             }
+            DataType::Timestamp => {
+                push_extended_temporal!(key, value, builder, timestamp_formatter, push_timestamp)
+            }
+            DataType::Date => {
+                push_extended_temporal!(key, value, builder, date_formatter, push_date)
+            }
+            DataType::Time => {
+                push_extended_temporal!(key, value, builder, time_formatter, push_time)
+            }
         }
     }
 
@@ -355,9 +403,24 @@ fn write_extended_object_to_array<T: ArrBuilder>(builder: &mut T, object: &Map<C
         };
     }
 
+    macro_rules! push_extended_temporal {
+        ($value: expr, $builder: expr, $fmt: ident, $method: ident) => {
+            if let Value::String(str) = $value {
+                if let Ok(t) = $fmt().parse(str) {
+                    $builder.$method(t)?;
+                    return Ok(true);
+                }
+            }
+        };
+    }
+
     // SAFETY: object has one entry.
     let (obj_key, value) = object.iter().next().unwrap();
-    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(obj_key)) {
+    let key_str = obj_key.as_ref();
+    if key_str.as_bytes().first() != Some(&EXTENDED_NAME_PREFIX) {
+        return Ok(false);
+    }
+    if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(key_str)) {
         let data_type = EXTENDED_NAME_TYPES[index].1;
         match data_type {
             DataType::Object => unreachable!(),
@@ -392,6 +455,15 @@ fn write_extended_object_to_array<T: ArrBuilder>(builder: &mut T, object: &Map<C
                     Ok(())
                 })?;
                 return Ok(ret);
+            }
+            DataType::Timestamp => {
+                push_extended_temporal!(value, builder, timestamp_formatter, push_timestamp)
+            }
+            DataType::Date => {
+                push_extended_temporal!(value, builder, date_formatter, push_date)
+            }
+            DataType::Time => {
+                push_extended_temporal!(value, builder, time_formatter, push_time)
             }
         }
     }

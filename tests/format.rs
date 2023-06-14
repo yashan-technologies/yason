@@ -225,6 +225,69 @@ fn test_scalar_fmt() {
         true,
         false,
     );
+
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTimestamp": "2023-05-25T16:50:20.123"}"#,
+        r#"{"$yashanTimestamp":"2023-05-25T16:50:20.123000"}"#,
+        "{\n  \"$yashanTimestamp\" : \"2023-05-25T16:50:20.123000\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTimestamp": "2023-05-25T16:50:20"}"#,
+        r#"{"$yashanTimestamp":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanTimestamp\" : \"2023-05-25T16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTimestamp": "2023-05-25T16:50:20.123Z"}"#,
+        r#"{"$yashanTimestamp":"2023-05-25T16:50:20.123000"}"#,
+        "{\n  \"$yashanTimestamp\" : \"2023-05-25T16:50:20.123000\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTimestamp": "2023-05-25T16:50:20Z"}"#,
+        r#"{"$yashanTimestamp":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanTimestamp\" : \"2023-05-25T16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleTimestamp": "2023-05-25T16:50:20.123"}"#,
+        r#"{"$yashanTimestamp":"2023-05-25T16:50:20.123000"}"#,
+        "{\n  \"$yashanTimestamp\" : \"2023-05-25T16:50:20.123000\"\n}",
+    );
+
+    assert_extended_scalar_fmt(
+        r#"{"$yashanDate": "2023-05-25T16:50:20"}"#,
+        r#"{"$yashanDate":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanDate\" : \"2023-05-25T16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanDate": "2023-05-25T16:50:20.123"}"#,
+        r#"{"$yashanDate":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanDate\" : \"2023-05-25T16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanDate": "2023-05-25T16:50:20Z"}"#,
+        r#"{"$yashanDate":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanDate\" : \"2023-05-25T16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanDate": "2023-05-25T16:50:20.123Z"}"#,
+        r#"{"$yashanDate":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanDate\" : \"2023-05-25T16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleDate": "2023-05-25T16:50:20Z"}"#,
+        r#"{"$yashanDate":"2023-05-25T16:50:20"}"#,
+        "{\n  \"$yashanDate\" : \"2023-05-25T16:50:20\"\n}",
+    );
+
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTime": "16:50:20"}"#,
+        r#"{"$yashanTime":"16:50:20"}"#,
+        "{\n  \"$yashanTime\" : \"16:50:20\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTime": "16:50:20.123"}"#,
+        r#"{"$yashanTime":"16:50:20.123000"}"#,
+        "{\n  \"$yashanTime\" : \"16:50:20.123000\"\n}",
+    );
 }
 
 #[test]
@@ -257,6 +320,10 @@ fn test_compact_fmt() {
             r#"{ "bin2": {"$binary": "aGVsbG8h"}, "bin1": {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}}"#,
             r#"{"bin1":{"$binary":"SmF2YVNjcmlwdA=="},"bin2":{"$binary":"aGVsbG8h"}}"#,
         );
+        assert_extended_compact_fmt(
+            r#"{"ts": {"$yashanTimestamp": "2023-05-25T16:50:20.123Z"}, "date": {"$yashanDate": "2023-05-25"}, "time": {"$yashanTime": "16:50:20.123"}}"#,
+            r#"{"ts":{"$yashanTimestamp":"2023-05-25T16:50:20.123000"},"date":{"$yashanDate":"2023-05-25T00:00:00"},"time":{"$yashanTime":"16:50:20.123000"}}"#,
+        );
     }
 
     // array
@@ -279,6 +346,10 @@ fn test_compact_fmt() {
         assert_extended_compact_fmt(
             r#"[{"$binary": "aGVsbG8h"}, {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}]"#,
             r#"[{"$binary":"aGVsbG8h"},{"$binary":"SmF2YVNjcmlwdA=="}]"#,
+        );
+        assert_extended_compact_fmt(
+            r#"[{"$yashanTimestamp": "2023-05-25T16:50:20.123Z"}, {"$yashanDate": "2023-05-25"}, {"$yashanTime": "16:50:20.123"}]"#,
+            r#"[{"$yashanTimestamp":"2023-05-25T16:50:20.123000"},{"$yashanDate":"2023-05-25T00:00:00"},{"$yashanTime":"16:50:20.123000"}]"#,
         );
     }
 }
@@ -317,6 +388,10 @@ fn test_pretty_fmt() {
             r#"{ "bin2": {"$binary": "aGVsbG8h"}, "bin1": {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}}"#,
             "{\n  \"bin1\" : {\n    \"$binary\" : \"SmF2YVNjcmlwdA==\"\n  },\n  \"bin2\" : {\n    \"$binary\" : \"aGVsbG8h\"\n  }\n}",
         );
+        assert_extended_pretty_fmt(
+            r#"{"ts": {"$yashanTimestamp": "2023-05-25T16:50:20.123Z"}, "date": {"$yashanDate": "2023-05-25"}, "time": {"$yashanTime": "16:50:20.123"}}"#,
+            "{\n  \"ts\" : {\n    \"$yashanTimestamp\" : \"2023-05-25T16:50:20.123000\"\n  },\n  \"date\" : {\n    \"$yashanDate\" : \"2023-05-25T00:00:00\"\n  },\n  \"time\" : {\n    \"$yashanTime\" : \"16:50:20.123000\"\n  }\n}",
+        );
     }
 
     // array
@@ -345,6 +420,10 @@ fn test_pretty_fmt() {
         assert_extended_pretty_fmt(
             r#"[{"$binary": "aGVsbG8h"}, {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}]"#,
             "[\n  {\n    \"$binary\" : \"aGVsbG8h\"\n  },\n  {\n    \"$binary\" : \"SmF2YVNjcmlwdA==\"\n  }\n]",
+        );
+        assert_extended_pretty_fmt(
+            r#"[{"$yashanTimestamp": "2023-05-25T16:50:20.123Z"}, {"$yashanDate": "2023-05-25"}, {"$yashanTime": "16:50:20.123"}]"#,
+            "[\n  {\n    \"$yashanTimestamp\" : \"2023-05-25T16:50:20.123000\"\n  },\n  {\n    \"$yashanDate\" : \"2023-05-25T00:00:00\"\n  },\n  {\n    \"$yashanTime\" : \"16:50:20.123000\"\n  }\n]",
         );
     }
 }

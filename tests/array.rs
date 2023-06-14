@@ -1,6 +1,8 @@
 //! Array builder tests.
 
-use yason::{ArrayBuilder, ArrayRefBuilder, BuildError, DataType, Number, Value, Yason, YasonBuf};
+use yason::{
+    ArrayBuilder, ArrayRefBuilder, BuildError, DataType, Date, Number, Time, Timestamp, Value, Yason, YasonBuf,
+};
 
 fn assert_string<T: AsRef<str>>(input: Value, expected: T) {
     if let Value::String(value) = input {
@@ -51,7 +53,7 @@ macro_rules! assert_value_eq {
 
 fn assert_array(yason: &Yason) {
     let array = yason.array().unwrap();
-    assert_eq!(array.len().unwrap(), 13);
+    assert_eq!(array.len().unwrap(), 16);
     assert!(!array.is_empty().unwrap());
     assert_eq!(array.type_of(0).unwrap(), DataType::Number);
     assert!(array.is_type(1, DataType::String).unwrap());
@@ -68,12 +70,15 @@ fn assert_array(yason: &Yason) {
     assert_value_eq!(Float, array.get(8).unwrap(), 123.456_f32);
     assert_value_eq!(Double, array.get(9).unwrap(), 12.3456789_f64);
     assert_binary(array.get(10).unwrap(), b"abc");
-    assert_eq!(array.get(11).unwrap().data_type(), DataType::Array);
-    assert_eq!(array.get(12).unwrap().data_type(), DataType::Object);
+    assert_value_eq!(Timestamp, array.get(11).unwrap(), Timestamp::MAX);
+    assert_value_eq!(Date, array.get(12).unwrap(), Date::MAX);
+    assert_value_eq!(Time, array.get(13).unwrap(), Time::MAX);
+    assert_eq!(array.get(14).unwrap().data_type(), DataType::Array);
+    assert_eq!(array.get(15).unwrap().data_type(), DataType::Object);
 
     assert!(array.bool(0).is_err());
 
-    let value = array.get(13);
+    let value = array.get(16);
     assert!(value.is_err());
 
     // tests iter
@@ -102,14 +107,23 @@ fn assert_array(yason: &Yason) {
         } else if id == 10 {
             assert_binary(value, b"abc");
         } else if id == 11 {
-            assert_eq!(value.data_type(), DataType::Array);
+            assert_value_eq!(Timestamp, value, Timestamp::MAX);
         } else if id == 12 {
+            assert_value_eq!(Date, value, Date::MAX);
+        } else if id == 13 {
+            assert_value_eq!(Time, value, Time::MAX);
+        } else if id == 14 {
+            assert_eq!(value.data_type(), DataType::Array);
+        } else if id == 15 {
             assert_eq!(value.data_type(), DataType::Object);
         }
     }
 
-    assert_eq!(array.object(12).unwrap().string("key").unwrap().unwrap(), "value");
-    assert!(array.array(11).unwrap().bool(0).unwrap());
+    assert_eq!(array.object(15).unwrap().string("key").unwrap().unwrap(), "value");
+    assert!(array.array(14).unwrap().bool(0).unwrap());
+    assert_eq!(array.time(13).unwrap(), Time::MAX);
+    assert_eq!(array.date(12).unwrap(), Date::MAX);
+    assert_eq!(array.timestamp(11).unwrap(), Timestamp::MAX);
     assert_eq!(array.binary(10).unwrap(), b"abc");
     assert_eq!(array.double(9).unwrap(), 12.3456789_f64);
     assert_eq!(array.float(8).unwrap(), 123.456_f32);
@@ -123,7 +137,7 @@ fn assert_array(yason: &Yason) {
 }
 
 fn create_yason() -> YasonBuf {
-    let mut builder = ArrayBuilder::try_new(13).unwrap();
+    let mut builder = ArrayBuilder::try_new(16).unwrap();
     builder.push_number(Number::from(123)).unwrap();
     builder.push_string("abc").unwrap();
     builder.push_null().unwrap();
@@ -135,6 +149,9 @@ fn create_yason() -> YasonBuf {
     builder.push_float(123.456_f32).unwrap();
     builder.push_double(12.3456789_f64).unwrap();
     builder.push_binary(b"abc").unwrap();
+    builder.push_timestamp(Timestamp::MAX).unwrap();
+    builder.push_date(Date::MAX).unwrap();
+    builder.push_time(Time::MAX).unwrap();
 
     let mut array_builder = builder.push_array(1).unwrap();
     array_builder.push_bool(true).unwrap();
@@ -148,7 +165,7 @@ fn create_yason() -> YasonBuf {
 }
 
 fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
-    let mut builder = ArrayRefBuilder::try_new(bytes, 13).unwrap();
+    let mut builder = ArrayRefBuilder::try_new(bytes, 16).unwrap();
     builder.push_number(Number::from(123)).unwrap();
     builder.push_string("abc").unwrap();
     builder.push_null().unwrap();
@@ -160,6 +177,9 @@ fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
     builder.push_float(123.456_f32).unwrap();
     builder.push_double(12.3456789_f64).unwrap();
     builder.push_binary(b"abc").unwrap();
+    builder.push_timestamp(Timestamp::MAX).unwrap();
+    builder.push_date(Date::MAX).unwrap();
+    builder.push_time(Time::MAX).unwrap();
 
     let mut array_builder = builder.push_array(1).unwrap();
     array_builder.push_bool(true).unwrap();

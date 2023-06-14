@@ -213,6 +213,9 @@ fn values_to_yason<'a>(values: &[Value], bytes: &'a mut Vec<u8>) -> YasonResult<
             Value::Float(f) => builder.push_float(*f)?,
             Value::Double(f) => builder.push_double(*f)?,
             Value::Binary(bin) => builder.push_binary(bin)?,
+            Value::Timestamp(t) => builder.push_timestamp(*t)?,
+            Value::Date(t) => builder.push_date(*t)?,
+            Value::Time(t) => builder.push_time(*t)?,
         };
     }
 

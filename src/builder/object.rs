@@ -1,15 +1,12 @@
 //! Object builder.
 
-use crate::binary::{
-    BIGINT_SIZE, BOOL_SIZE, DATA_TYPE_SIZE, DOUBLE_SIZE, ELEMENT_COUNT_SIZE, FLOAT_SIZE, INTEGER_SIZE, KEY_LENGTH_SIZE,
-    KEY_OFFSET_SIZE, MAX_DATA_LENGTH_SIZE, NUMBER_LENGTH_SIZE, OBJECT_SIZE, SMALLINT_SIZE, TINYINT_SIZE,
-};
+use crate::binary::*;
 use crate::builder::array::{ArrayRefBuilder, InnerArrayBuilder};
 use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
 use crate::util::cmp_key;
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
-use crate::{BuildError, DataType, Number};
+use crate::{BuildError, DataType, Date, Number, Time, Timestamp};
 use decimal_rs::MAX_BINARY_SIZE;
 use std::ptr;
 
@@ -321,6 +318,39 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
         };
         self.push_key_value_by(key, size, f)
     }
+
+    #[inline]
+    fn push_timestamp(&mut self, key: &str, value: Timestamp) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + TIMESTAMP_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Timestamp);
+            bytes.push_timestamp(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_date(&mut self, key: &str, value: Date) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + DATE_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Date);
+            bytes.push_date(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
+
+    #[inline]
+    fn push_time(&mut self, key: &str, value: Time) -> BuildResult<()> {
+        let size = KEY_LENGTH_SIZE + key.len() + DATA_TYPE_SIZE + TIME_SIZE;
+        let f = |bytes: &mut Vec<u8>| {
+            bytes.push_data_type(DataType::Time);
+            bytes.push_time(value);
+            Ok(())
+        };
+        self.push_key_value_by(key, size, f)
+    }
 }
 
 /// Builder for encoding an object.
@@ -411,6 +441,15 @@ pub trait ObjBuilder {
 
     /// Pushes a double value.
     fn push_double<Key: AsRef<str>>(&mut self, key: Key, value: f64) -> BuildResult<&mut Self>;
+
+    /// Pushes a timestamp value.
+    fn push_timestamp<Key: AsRef<str>>(&mut self, key: Key, value: Timestamp) -> BuildResult<&mut Self>;
+
+    /// Pushes a date value.
+    fn push_date<Key: AsRef<str>>(&mut self, key: Key, value: Date) -> BuildResult<&mut Self>;
+
+    /// Pushes a time value.
+    fn push_time<Key: AsRef<str>>(&mut self, key: Key, value: Time) -> BuildResult<&mut Self>;
 }
 
 macro_rules! impl_push_methods {
@@ -531,6 +570,30 @@ macro_rules! impl_push_methods {
         $v fn push_double<Key: AsRef<str>>(&mut self, key: Key, value: f64) -> BuildResult<&mut Self> {
             let key = key.as_ref();
             self.0.push_double(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a timestamp value.
+        #[inline]
+        $v fn push_timestamp<Key: AsRef<str>>(&mut self, key: Key, value: Timestamp) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_timestamp(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a date value.
+        #[inline]
+        $v fn push_date<Key: AsRef<str>>(&mut self, key: Key, value: Date) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_date(key, value)?;
+            Ok(self)
+        }
+
+        /// Pushes a time value.
+        #[inline]
+        $v fn push_time<Key: AsRef<str>>(&mut self, key: Key, value: Time) -> BuildResult<&mut Self> {
+            let key = key.as_ref();
+            self.0.push_time(key, value)?;
             Ok(self)
         }
     };

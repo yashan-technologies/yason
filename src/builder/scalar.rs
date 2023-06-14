@@ -1,13 +1,10 @@
 //! Scalar builder.
 
-use crate::binary::{
-    BIGINT_SIZE, BOOL_SIZE, DATA_TYPE_SIZE, DOUBLE_SIZE, FLOAT_SIZE, INTEGER_SIZE, MAX_DATA_LENGTH_SIZE,
-    NUMBER_LENGTH_SIZE, SMALLINT_SIZE, TINYINT_SIZE,
-};
+use crate::binary::*;
 use crate::builder::BuildResult;
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
-use crate::{DataType, Number};
+use crate::{DataType, Date, Number, Time, Timestamp};
 use decimal_rs::MAX_BINARY_SIZE;
 
 /// Builder for encoding a scalar value.
@@ -221,6 +218,63 @@ impl Scalar {
         bytes.try_reserve(size)?;
         bytes.push_data_type(DataType::Double);
         bytes.push_f64(value);
+        Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
+    }
+
+    /// Encodes a timestamp value.
+    #[inline]
+    pub fn timestamp(value: Timestamp) -> BuildResult<YasonBuf> {
+        let mut bytes = Vec::new();
+        Scalar::timestamp_with_vec(value, &mut bytes)?;
+        Ok(unsafe { YasonBuf::new_unchecked(bytes) })
+    }
+
+    /// Encodes a timestamp value into the provided vector.
+    #[inline]
+    pub fn timestamp_with_vec(value: Timestamp, bytes: &mut Vec<u8>) -> BuildResult<&Yason> {
+        let init_len = bytes.len();
+        let size = DATA_TYPE_SIZE + TIMESTAMP_SIZE;
+        bytes.try_reserve(size)?;
+        bytes.push_data_type(DataType::Timestamp);
+        bytes.push_timestamp(value);
+        Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
+    }
+
+    /// Encodes a date value.
+    #[inline]
+    pub fn date(value: Date) -> BuildResult<YasonBuf> {
+        let mut bytes = Vec::new();
+        Scalar::date_with_vec(value, &mut bytes)?;
+        Ok(unsafe { YasonBuf::new_unchecked(bytes) })
+    }
+
+    /// Encodes a date value into the provided vector.
+    #[inline]
+    pub fn date_with_vec(value: Date, bytes: &mut Vec<u8>) -> BuildResult<&Yason> {
+        let init_len = bytes.len();
+        let size = DATA_TYPE_SIZE + DATE_SIZE;
+        bytes.try_reserve(size)?;
+        bytes.push_data_type(DataType::Date);
+        bytes.push_date(value);
+        Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
+    }
+
+    /// Encodes a time value.
+    #[inline]
+    pub fn time(value: Time) -> BuildResult<YasonBuf> {
+        let mut bytes = Vec::new();
+        Scalar::time_with_vec(value, &mut bytes)?;
+        Ok(unsafe { YasonBuf::new_unchecked(bytes) })
+    }
+
+    /// Encodes a time value into the provided vector.
+    #[inline]
+    pub fn time_with_vec(value: Time, bytes: &mut Vec<u8>) -> BuildResult<&Yason> {
+        let init_len = bytes.len();
+        let size = DATA_TYPE_SIZE + TIME_SIZE;
+        bytes.try_reserve(size)?;
+        bytes.push_data_type(DataType::Time);
+        bytes.push_time(value);
         Ok(unsafe { Yason::new_unchecked(&bytes[init_len..]) })
     }
 }

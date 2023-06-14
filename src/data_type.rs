@@ -20,11 +20,29 @@ pub enum DataType {
     Float = 11,
     Double = 12,
     Binary = 13,
+    Timestamp = 14,
+    Date = 15,
+    Time = 16,
 }
 
-const DATA_TYPE_NAME: [&str; 14] = [
-    "invalid", "object", "array", "string", "number", "boolean", "null", "tinyint", "smallint", "integer", "bigint",
-    "float", "double", "binary",
+const DATA_TYPE_NAME: [&str; 17] = [
+    "invalid",
+    "object",
+    "array",
+    "string",
+    "number",
+    "boolean",
+    "null",
+    "tinyint",
+    "smallint",
+    "integer",
+    "bigint",
+    "float",
+    "double",
+    "binary",
+    "timestamp",
+    "date",
+    "time",
 ];
 
 impl DataType {
@@ -58,6 +76,9 @@ impl Display for DataType {
             DataType::Float => write!(f, "Float"),
             DataType::Double => write!(f, "Double"),
             DataType::Binary => write!(f, "Binary"),
+            DataType::Timestamp => write!(f, "Timestamp"),
+            DataType::Date => write!(f, "Date"),
+            DataType::Time => write!(f, "Time"),
         }
     }
 }
@@ -86,6 +107,9 @@ impl TryFrom<u8> for DataType {
             11 => Ok(DataType::Float),
             12 => Ok(DataType::Double),
             13 => Ok(DataType::Binary),
+            14 => Ok(DataType::Timestamp),
+            15 => Ok(DataType::Date),
+            16 => Ok(DataType::Time),
             v => Err(InvalidDataType(v)),
         }
     }

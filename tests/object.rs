@@ -1,6 +1,8 @@
 //! Object builder tests.
 
-use yason::{BuildError, DataType, Number, ObjectBuilder, ObjectRefBuilder, Value, Yason, YasonBuf};
+use yason::{
+    BuildError, DataType, Date, Number, ObjectBuilder, ObjectRefBuilder, Time, Timestamp, Value, Yason, YasonBuf,
+};
 
 fn assert_string<T: AsRef<str>>(input: Value, expected: T) {
     if let Value::String(value) = input {
@@ -51,7 +53,7 @@ macro_rules! assert_value_eq {
 
 fn assert_object(yason: &Yason) {
     let object = yason.object().unwrap();
-    assert_eq!(object.len().unwrap(), 13);
+    assert_eq!(object.len().unwrap(), 16);
     assert!(!object.is_empty().unwrap());
     assert_eq!(object.type_of("id").unwrap().unwrap(), DataType::Number);
     assert!(object.is_type("name", DataType::String).unwrap().unwrap());
@@ -67,9 +69,12 @@ fn assert_object(yason: &Yason) {
     assert_value_eq!(Bigint, object.get("bigint").unwrap().unwrap(), 12345678_i64);
     assert_value_eq!(Float, object.get("float").unwrap().unwrap(), 123.456_f32);
     assert_value_eq!(Double, object.get("double").unwrap().unwrap(), 12.3456789_f64);
+    assert_binary(object.get("binary").unwrap().unwrap(), b"abc");
+    assert_value_eq!(Timestamp, object.get("timestamp").unwrap().unwrap(), Timestamp::MAX);
+    assert_value_eq!(Date, object.get("date").unwrap().unwrap(), Date::MAX);
+    assert_value_eq!(Time, object.get("time").unwrap().unwrap(), Time::MAX);
     assert_eq!(object.get("array").unwrap().unwrap().data_type(), DataType::Array);
     assert_eq!(object.get("object").unwrap().unwrap().data_type(), DataType::Object);
-    assert_binary(object.get("binary").unwrap().unwrap(), b"abc");
 
     assert_eq!(object.number("id").unwrap().unwrap(), Number::from(1));
     assert_eq!(object.string("name").unwrap().unwrap(), "abc");
@@ -84,6 +89,9 @@ fn assert_object(yason: &Yason) {
     assert_eq!(object.array("array").unwrap().unwrap().len().unwrap(), 1);
     assert_eq!(object.object("object").unwrap().unwrap().len().unwrap(), 1);
     assert_eq!(object.binary("binary").unwrap().unwrap(), b"abc");
+    assert_eq!(object.timestamp("timestamp").unwrap().unwrap(), Timestamp::MAX);
+    assert_eq!(object.date("date").unwrap().unwrap(), Date::MAX);
+    assert_eq!(object.time("time").unwrap().unwrap(), Time::MAX);
 
     assert!(object.bool("id").is_err());
 
@@ -97,41 +105,50 @@ fn assert_object(yason: &Yason) {
             assert_eq!(key, "id");
             assert_number(value, Number::from(1));
         } else if id == 1 {
+            assert_eq!(key, "date");
+            assert_value_eq!(Date, value, Date::MAX);
+        } else if id == 2 {
             assert_eq!(key, "name");
             assert_string(value, "abc");
-        } else if id == 2 {
+        } else if id == 3 {
+            assert_eq!(key, "time");
+            assert_value_eq!(Time, value, Time::MAX);
+        } else if id == 4 {
             assert_eq!(key, "array");
             assert_eq!(value.data_type(), DataType::Array);
-        } else if id == 3 {
+        } else if id == 5 {
             assert_eq!(key, "child");
             assert_bool(value, false);
-        } else if id == 4 {
+        } else if id == 6 {
             assert_eq!(key, "float");
             assert_value_eq!(Float, value, 123.456_f32);
-        } else if id == 5 {
+        } else if id == 7 {
             assert_eq!(key, "phone");
             assert_null(value);
-        } else if id == 6 {
+        } else if id == 8 {
             assert_eq!(key, "bigint");
             assert_value_eq!(Bigint, value, 12345678_i64);
-        } else if id == 7 {
+        } else if id == 9 {
             assert_eq!(key, "binary");
             assert_binary(value, b"abc");
-        } else if id == 8 {
+        } else if id == 10 {
             assert_eq!(key, "double");
             assert_value_eq!(Double, value, 12.3456789_f64);
-        } else if id == 9 {
+        } else if id == 11 {
             assert_eq!(key, "object");
             assert_eq!(value.data_type(), DataType::Object);
-        } else if id == 10 {
+        } else if id == 12 {
             assert_eq!(key, "integer");
             assert_value_eq!(Integer, value, 1234567_i32);
-        } else if id == 11 {
+        } else if id == 13 {
             assert_eq!(key, "tinyint");
             assert_value_eq!(Tinyint, value, 123_i8);
-        } else if id == 12 {
+        } else if id == 14 {
             assert_eq!(key, "smallint");
             assert_value_eq!(Smallint, value, 12345_i16);
+        } else if id == 15 {
+            assert_eq!(key, "timestamp");
+            assert_value_eq!(Timestamp, value, Timestamp::MAX);
         } else {
             panic!();
         }
@@ -143,29 +160,35 @@ fn assert_object(yason: &Yason) {
         if id == 0 {
             assert_eq!(key, "id");
         } else if id == 1 {
-            assert_eq!(key, "name");
+            assert_eq!(key, "date");
         } else if id == 2 {
-            assert_eq!(key, "array");
+            assert_eq!(key, "name");
         } else if id == 3 {
-            assert_eq!(key, "child");
+            assert_eq!(key, "time");
         } else if id == 4 {
-            assert_eq!(key, "float");
+            assert_eq!(key, "array");
         } else if id == 5 {
-            assert_eq!(key, "phone");
+            assert_eq!(key, "child");
         } else if id == 6 {
-            assert_eq!(key, "bigint");
+            assert_eq!(key, "float");
         } else if id == 7 {
-            assert_eq!(key, "binary");
+            assert_eq!(key, "phone");
         } else if id == 8 {
-            assert_eq!(key, "double");
+            assert_eq!(key, "bigint");
         } else if id == 9 {
-            assert_eq!(key, "object");
+            assert_eq!(key, "binary");
         } else if id == 10 {
-            assert_eq!(key, "integer");
+            assert_eq!(key, "double");
         } else if id == 11 {
-            assert_eq!(key, "tinyint");
+            assert_eq!(key, "object");
         } else if id == 12 {
+            assert_eq!(key, "integer");
+        } else if id == 13 {
+            assert_eq!(key, "tinyint");
+        } else if id == 14 {
             assert_eq!(key, "smallint");
+        } else if id == 15 {
+            assert_eq!(key, "timestamp");
         } else {
             panic!();
         }
@@ -177,29 +200,35 @@ fn assert_object(yason: &Yason) {
         if id == 0 {
             assert_number(value, Number::from(1));
         } else if id == 1 {
-            assert_string(value, "abc");
+            assert_value_eq!(Date, value, Date::MAX);
         } else if id == 2 {
-            assert_eq!(value.data_type(), DataType::Array);
+            assert_string(value, "abc");
         } else if id == 3 {
-            assert_bool(value, false);
+            assert_value_eq!(Time, value, Time::MAX);
         } else if id == 4 {
-            assert_value_eq!(Float, value, 123.456_f32);
+            assert_eq!(value.data_type(), DataType::Array);
         } else if id == 5 {
-            assert_null(value);
+            assert_bool(value, false);
         } else if id == 6 {
-            assert_value_eq!(Bigint, value, 12345678_i64);
+            assert_value_eq!(Float, value, 123.456_f32);
         } else if id == 7 {
-            assert_binary(value, b"abc");
+            assert_null(value);
         } else if id == 8 {
-            assert_value_eq!(Double, value, 12.3456789_f64);
+            assert_value_eq!(Bigint, value, 12345678_i64);
         } else if id == 9 {
-            assert_eq!(value.data_type(), DataType::Object);
+            assert_binary(value, b"abc");
         } else if id == 10 {
-            assert_value_eq!(Integer, value, 1234567_i32);
+            assert_value_eq!(Double, value, 12.3456789_f64);
         } else if id == 11 {
-            assert_value_eq!(Tinyint, value, 123_i8);
+            assert_eq!(value.data_type(), DataType::Object);
         } else if id == 12 {
+            assert_value_eq!(Integer, value, 1234567_i32);
+        } else if id == 13 {
+            assert_value_eq!(Tinyint, value, 123_i8);
+        } else if id == 14 {
             assert_value_eq!(Smallint, value, 12345_i16);
+        } else if id == 15 {
+            assert_value_eq!(Timestamp, value, Timestamp::MAX);
         } else {
             panic!();
         }
@@ -207,7 +236,7 @@ fn assert_object(yason: &Yason) {
 }
 
 fn create_yason() -> YasonBuf {
-    let mut builder = ObjectBuilder::try_new(13, false).unwrap();
+    let mut builder = ObjectBuilder::try_new(16, false).unwrap();
     builder.push_number("id", Number::from(1)).unwrap();
     builder.push_string("name", "abc").unwrap();
     builder.push_bool("child", false).unwrap();
@@ -219,6 +248,9 @@ fn create_yason() -> YasonBuf {
     builder.push_float("float", 123.456_f32).unwrap();
     builder.push_double("double", 12.3456789_f64).unwrap();
     builder.push_binary("binary", b"abc").unwrap();
+    builder.push_timestamp("timestamp", Timestamp::MAX).unwrap();
+    builder.push_date("date", Date::MAX).unwrap();
+    builder.push_time("time", Time::MAX).unwrap();
 
     let mut array_builder = builder.push_array("array", 1).unwrap();
     array_builder.push_bool(true).unwrap();
@@ -232,7 +264,7 @@ fn create_yason() -> YasonBuf {
 }
 
 fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
-    let mut builder = ObjectRefBuilder::try_new(bytes, 13, false).unwrap();
+    let mut builder = ObjectRefBuilder::try_new(bytes, 16, false).unwrap();
     builder.push_number("id", Number::from(1)).unwrap();
     builder.push_string("name", "abc").unwrap();
     builder.push_bool("child", false).unwrap();
@@ -244,6 +276,9 @@ fn create_yason_with_vec(bytes: &mut Vec<u8>) -> &Yason {
     builder.push_float("float", 123.456_f32).unwrap();
     builder.push_double("double", 12.3456789_f64).unwrap();
     builder.push_binary("binary", b"abc").unwrap();
+    builder.push_timestamp("timestamp", Timestamp::MAX).unwrap();
+    builder.push_date("date", Date::MAX).unwrap();
+    builder.push_time("time", Time::MAX).unwrap();
 
     let mut array_builder = builder.push_array("array", 1).unwrap();
     array_builder.push_bool(true).unwrap();

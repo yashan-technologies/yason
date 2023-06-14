@@ -1,14 +1,11 @@
 //! Array builder.
 
-use crate::binary::{
-    ARRAY_SIZE, BIGINT_SIZE, DATA_TYPE_SIZE, DOUBLE_SIZE, ELEMENT_COUNT_SIZE, MAX_DATA_LENGTH_SIZE, NUMBER_LENGTH_SIZE,
-    VALUE_ENTRY_SIZE,
-};
+use crate::binary::*;
 use crate::builder::object::InnerObjectBuilder;
 use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
-use crate::{BuildError, DataType, Number, ObjectRefBuilder};
+use crate::{BuildError, DataType, Date, Number, ObjectRefBuilder, Time, Timestamp};
 use decimal_rs::MAX_BINARY_SIZE;
 
 pub(crate) struct InnerArrayBuilder<'a, B: AsMut<Vec<u8>>> {
@@ -243,6 +240,45 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
+    fn push_timestamp(&mut self, value: Timestamp) -> BuildResult<()> {
+        let size = DATA_TYPE_SIZE + TIMESTAMP_SIZE;
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Timestamp);
+            bytes.push_timestamp(value);
+            Ok(())
+        };
+        self.push_value(DataType::Timestamp, f)
+    }
+
+    #[inline]
+    fn push_date(&mut self, value: Date) -> BuildResult<()> {
+        let size = DATA_TYPE_SIZE + DATE_SIZE;
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Date);
+            bytes.push_date(value);
+            Ok(())
+        };
+        self.push_value(DataType::Date, f)
+    }
+
+    #[inline]
+    fn push_time(&mut self, value: Time) -> BuildResult<()> {
+        let size = DATA_TYPE_SIZE + TIME_SIZE;
+        let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
+            bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
+            bytes.try_reserve(size)?;
+            bytes.push_data_type(DataType::Time);
+            bytes.push_time(value);
+            Ok(())
+        };
+        self.push_value(DataType::Time, f)
+    }
+
+    #[inline]
     unsafe fn push_object_or_array(&mut self, yason: &Yason, data_type: DataType) -> BuildResult<()> {
         let value = yason.as_bytes();
         let size = value.len();
@@ -345,6 +381,15 @@ pub trait ArrBuilder {
 
     /// Pushes a double value.
     fn push_double(&mut self, value: f64) -> BuildResult<&mut Self>;
+
+    /// Pushes a timestamp value.
+    fn push_timestamp(&mut self, value: Timestamp) -> BuildResult<&mut Self>;
+
+    /// Pushes a date value.
+    fn push_date(&mut self, value: Date) -> BuildResult<&mut Self>;
+
+    /// Pushes a time value.
+    fn push_time(&mut self, value: Time) -> BuildResult<&mut Self>;
 }
 
 macro_rules! impl_push_methods {
@@ -439,6 +484,27 @@ macro_rules! impl_push_methods {
         #[inline]
         $v fn push_double(&mut self, value: f64) -> BuildResult<&mut Self> {
             self.0.push_double(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a timestamp value.
+        #[inline]
+        $v fn push_timestamp(&mut self, value: Timestamp) -> BuildResult<&mut Self> {
+            self.0.push_timestamp(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a date value.
+        #[inline]
+        $v fn push_date(&mut self, value: Date) -> BuildResult<&mut Self> {
+            self.0.push_date(value)?;
+            Ok(self)
+        }
+
+        /// Pushes a time value.
+        #[inline]
+        $v fn push_time(&mut self, value: Time) -> BuildResult<&mut Self> {
+            self.0.push_time(value)?;
             Ok(self)
         }
     };

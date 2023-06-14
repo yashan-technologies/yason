@@ -1,6 +1,6 @@
 //! Yason binary format.
 
-use crate::DataType;
+use crate::{DataType, Date, Time, Timestamp};
 use std::mem::size_of;
 
 pub const DATA_TYPE_SIZE: usize = size_of::<DataType>();
@@ -21,3 +21,6 @@ pub const INTEGER_SIZE: usize = size_of::<i32>();
 pub const BIGINT_SIZE: usize = size_of::<i64>();
 pub const FLOAT_SIZE: usize = size_of::<f32>();
 pub const DOUBLE_SIZE: usize = size_of::<f64>();
+pub const TIMESTAMP_SIZE: usize = size_of::<Timestamp>();
+pub const DATE_SIZE: usize = size_of::<Date>();
+pub const TIME_SIZE: usize = size_of::<Time>();

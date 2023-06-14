@@ -1,12 +1,9 @@
 //! Formatter.
 
-use crate::extended::{
-    BIGINT_EXTENDED_NAME, BINARY_EXTENDED_NAME, FLOAT_EXTENDED_NAME, MAX_SAFE_BIGINT, MIN_SAFE_BIGINT,
-    NUMBER_EXTENDED_NAME,
-};
+use crate::extended::*;
 use crate::vec::VecExt;
 use crate::yason::LazyValue;
-use crate::{Array, DataType, Number, Object, Value, Yason, YasonError};
+use crate::{Array, DataType, Date, Number, Object, Time, Timestamp, Value, Yason, YasonError};
 use decimal_rs::DecimalFormatError;
 pub use pretty::PrettyFormatter;
 use std::error::Error;
@@ -21,6 +18,7 @@ pub enum FormatError {
     FmtError(fmt::Error),
     NumberFormatError(DecimalFormatError),
     YasonError(YasonError),
+    DateTimeError(sqldatetime::Error),
 }
 
 impl Display for FormatError {
@@ -30,6 +28,7 @@ impl Display for FormatError {
             FormatError::FmtError(e) => write!(f, "{}", e),
             FormatError::NumberFormatError(e) => write!(f, "{}", e),
             FormatError::YasonError(e) => write!(f, "{}", e),
+            FormatError::DateTimeError(e) => write!(f, "{}", e),
         }
     }
 }
@@ -49,6 +48,13 @@ impl From<YasonError> for FormatError {
     #[inline]
     fn from(e: YasonError) -> Self {
         FormatError::YasonError(e)
+    }
+}
+
+impl From<sqldatetime::Error> for FormatError {
+    #[inline]
+    fn from(e: sqldatetime::Error) -> Self {
+        FormatError::DateTimeError(e)
     }
 }
 
@@ -116,6 +122,18 @@ pub trait Formatter {
             DataType::Binary => {
                 let binary = unsafe { value.binary()? };
                 self.write_binary(binary, writer)
+            }
+            DataType::Timestamp => {
+                let t = unsafe { value.timestamp()? };
+                self.write_timestamp(t, writer)
+            }
+            DataType::Date => {
+                let t = unsafe { value.date()? };
+                self.write_date(t, writer)
+            }
+            DataType::Time => {
+                let t = unsafe { value.time()? };
+                self.write_time(t, writer)
             }
         }
     }
@@ -227,6 +245,54 @@ pub trait Formatter {
         } else {
             self.begin_string(writer)?;
             format_binary_to_hex(value, writer)?;
+            self.end_string(writer)
+        }
+    }
+
+    #[inline]
+    fn write_timestamp<W: fmt::Write>(&mut self, value: Timestamp, writer: &mut W) -> FormatResult<()> {
+        self.write_extended_temporal(writer, TIMESTAMP_EXTENDED_NAME, |w| {
+            timestamp_formatter().format(value, w)?;
+            Ok(())
+        })
+    }
+
+    #[inline]
+    fn write_date<W: fmt::Write>(&mut self, value: Date, writer: &mut W) -> FormatResult<()> {
+        self.write_extended_temporal(writer, DATE_EXTENDED_NAME, |w| {
+            date_formatter().format(value, w)?;
+            Ok(())
+        })
+    }
+
+    #[inline]
+    fn write_time<W: fmt::Write>(&mut self, value: Time, writer: &mut W) -> FormatResult<()> {
+        self.write_extended_temporal(writer, TIME_EXTENDED_NAME, |w| {
+            time_formatter().format(value, w)?;
+            Ok(())
+        })
+    }
+
+    #[inline]
+    fn write_extended_temporal<W: fmt::Write, F>(
+        &mut self,
+        writer: &mut W,
+        extended_name: &str,
+        write_value: F,
+    ) -> FormatResult<()>
+    where
+        F: FnOnce(&mut W) -> FormatResult<()>,
+    {
+        if self.extended() {
+            self.write_extended_object(writer, extended_name, |w| {
+                w.write_bytes(b"\"")?;
+                write_value(w)?;
+                w.write_bytes(b"\"")?;
+                Ok(())
+            })
+        } else {
+            self.begin_string(writer)?;
+            write_value(writer)?;
             self.end_string(writer)
         }
     }
@@ -417,6 +483,9 @@ pub trait Formatter {
             Value::Float(f) => self.write_float(*f, writer),
             Value::Double(f) => self.write_double(*f, writer),
             Value::Binary(bin) => self.write_binary(bin, writer),
+            Value::Timestamp(t) => self.write_timestamp(*t, writer),
+            Value::Date(t) => self.write_date(*t, writer),
+            Value::Time(t) => self.write_time(*t, writer),
         }?;
 
         self.end_array_value(writer)

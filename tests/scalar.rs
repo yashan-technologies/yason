@@ -1,7 +1,7 @@
 //! Scalar tests.
 
 use std::str::FromStr;
-use yason::{DataType, Number, Scalar};
+use yason::{DataType, Date, Number, Scalar, Timestamp};
 
 #[test]
 fn test_string() {
@@ -238,4 +238,70 @@ fn test_binary() {
     assert_eq!(yason.data_type().unwrap(), DataType::Binary);
     let binary = yason.binary().unwrap();
     assert_eq!(binary, b"abc");
+}
+
+#[test]
+fn test_timestamp() {
+    let t = Timestamp::now().unwrap();
+    let yason = Scalar::timestamp(t).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Timestamp);
+    let n = yason.timestamp().unwrap();
+    assert_eq!(n, t);
+
+    // test from vec
+    let mut bytes: Vec<u8> = Vec::with_capacity(128);
+    let yason = Scalar::timestamp_with_vec(t, &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Timestamp);
+    let n = yason.timestamp().unwrap();
+    assert_eq!(n, t);
+
+    // test from used vec
+    let yason = Scalar::timestamp_with_vec(t, &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Timestamp);
+    let n = yason.timestamp().unwrap();
+    assert_eq!(n, t);
+}
+
+#[test]
+fn test_date() {
+    let t = Date::now().unwrap();
+    let yason = Scalar::date(t).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Date);
+    let n = yason.date().unwrap();
+    assert_eq!(n, t);
+
+    // test from vec
+    let mut bytes: Vec<u8> = Vec::with_capacity(128);
+    let yason = Scalar::date_with_vec(t, &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Date);
+    let n = yason.date().unwrap();
+    assert_eq!(n, t);
+
+    // test from used vec
+    let yason = Scalar::date_with_vec(t, &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Date);
+    let n = yason.date().unwrap();
+    assert_eq!(n, t);
+}
+
+#[test]
+fn test_time() {
+    let t = Timestamp::now().unwrap().extract().1;
+    let yason = Scalar::time(t).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Time);
+    let n = yason.time().unwrap();
+    assert_eq!(n, t);
+
+    // test from vec
+    let mut bytes: Vec<u8> = Vec::with_capacity(128);
+    let yason = Scalar::time_with_vec(t, &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Time);
+    let n = yason.time().unwrap();
+    assert_eq!(n, t);
+
+    // test from used vec
+    let yason = Scalar::time_with_vec(t, &mut bytes).unwrap();
+    assert_eq!(yason.data_type().unwrap(), DataType::Time);
+    let n = yason.time().unwrap();
+    assert_eq!(n, t);
 }
