@@ -35,7 +35,8 @@ pub const fn encoded_len(input_len: usize) -> usize {
 #[inline]
 pub const fn decoded_len_estimate(input_len: usize) -> usize {
     let rem = input_len % DECODE_CHUNK_SIZE;
-    let chunk_len = input_len / DECODE_CHUNK_SIZE + (rem > 0) as usize;
+    // When "aaaab", last "b" is useless and discarded
+    let chunk_len = input_len / DECODE_CHUNK_SIZE + (rem > 1) as usize;
     chunk_len * ENCODE_CHUNK_SIZE
 }
 
@@ -79,7 +80,6 @@ pub fn encode(input: &[u8], output: &mut [u8]) -> usize {
 #[derive(Debug, PartialEq, Eq)]
 pub enum DecodeError {
     InvalidByte(u8),
-    InvalidTrailing,
 }
 
 #[inline]
@@ -130,9 +130,10 @@ pub fn decode(input: &[u8], output: &mut [u8]) -> Result<usize, DecodeError> {
             let (c0, c1) = (rem_bytes[0], rem_bytes[1]);
             output[i] = (decode_byte(c0)? << 2) as u8 | (decode_byte(c1)? >> 4) as u8;
             i += 1;
-        } else {
-            return Err(DecodeError::InvalidTrailing);
         }
+
+        // When "aaaab", last "b" is useless and discarded.  Compatibility with Oracle & Mongo.  Called "Lax"
+        // decoding in yason.
     }
 
     Ok(i)
@@ -204,14 +205,6 @@ mod tests {
             assert_eq!(expected_encoded, &decode_buf[0..decoded_len]);
         }
 
-        fn assert_decode_error(input: &[u8], error: DecodeError) {
-            let estimated_decoded_len = decoded_len_estimate(input.len());
-            let mut decode_buf = vec![0u8; estimated_decoded_len];
-            let ret = decode(input, &mut decode_buf[0..estimated_decoded_len]);
-            assert!(ret.is_err());
-            assert_eq!(ret.unwrap_err(), error);
-        }
-
         assert_codec(b"", b"");
         assert_codec(b"f", b"Zg==");
         assert_codec(b"fo", b"Zm8=");
@@ -228,6 +221,12 @@ mod tests {
         assert_codec("★😔".as_bytes(), b"4piF8J+YlA==");
         assert_codec("🏆☕️💤".as_bytes(), b"8J+PhuKYle+4j/CfkqQ=");
         assert_decode(b"SmF2YVNjcmlwdA", b"JavaScript");
-        assert_decode_error(b"SmF2YVNjcmlwd", DecodeError::InvalidTrailing);
+        assert_decode(b"s", b"");
+
+        {
+            const DE: &[u8; 9] = b"JavaScrip";
+            assert_decode(b"SmF2YVNjcmlwd", DE);
+            assert_decode(b"SmF2YVNjcmlw", DE);
+        }
     }
 }
