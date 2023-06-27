@@ -5,6 +5,8 @@ use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
 use std::num::FpCategory;
 use std::ops::Deref;
+#[cfg(target_os = "windows")]
+use std::os::raw::{c_char, c_int};
 
 pub(crate) trait Floating: Copy {
     const FORMAT: &'static str;
@@ -68,6 +70,15 @@ impl<T: Floating> Deref for FloatingFormat<T> {
     }
 }
 
+#[cfg(target_os = "windows")]
+extern "C" {
+    fn snprintf(s: *mut c_char, n: usize,
+                    format: *const c_char, ...) -> c_int;
+}
+
+#[cfg(not(target_os = "windows"))]
+use libc::snprintf;
+
 impl<T: Floating> Display for FloatingFormat<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -89,7 +100,7 @@ impl<T: Floating> Display for FloatingFormat<T> {
                 // SAFETY: snprintf should always work with a valid and sufficiently-large buffer.
                 let (buf, size) = unsafe {
                     // See the docstring of Floating::into_f64() for why we have this function.
-                    let size = libc::snprintf(s, BUF_SIZE, fmt, self.into_f64());
+                    let size = snprintf(s, BUF_SIZE, fmt, self.into_f64());
                     (buf.assume_init(), size as usize)
                 };
 
