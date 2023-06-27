@@ -16,6 +16,7 @@ documentation = "https://docs.rs/yason/"
 decimal-rs = "0.1.44"
 sqldatetime = { version = "0.1.38", features = ["oracle"] }
 serde = { version = "1.0.138", optional = true }
+libc = "0.2.146"
 
 [dev-dependencies]
 bencher = "0.1.5"

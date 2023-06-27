@@ -7,9 +7,11 @@ use crate::{Array, DataType, Date, Number, Object, Time, Timestamp, Value, Yason
 use decimal_rs::DecimalFormatError;
 pub use pretty::PrettyFormatter;
 use std::error::Error;
-use std::fmt;
-use std::fmt::Display;
+use std::fmt::{self, Display, Write};
 
+use self::float::FloatingFormat;
+
+mod float;
 mod pretty;
 
 /// Possible errors that can arise during formatting.
@@ -188,22 +190,45 @@ pub trait Formatter {
     }
 
     #[inline]
-    fn write_float<W: fmt::Write>(&mut self, value: f32, writer: &mut W) -> FormatResult<()> {
+    fn write_float<W: Write>(&mut self, value: f32, writer: &mut W) -> FormatResult<()> {
+        let value = FloatingFormat(value);
+        let write_quoted = |w: &mut W| {
+            write!(w, r#""{}""#, value)?;
+            Ok(())
+        };
+
         if self.extended() {
-            self.write_extended_object(writer, FLOAT_EXTENDED_NAME, |w| {
-                write!(w, "\"{}\"", value)?;
-                Ok(())
-            })
-        } else {
+            // Extended: wrap
+            self.write_extended_object(writer, FLOAT_EXTENDED_NAME, write_quoted)
+        } else if value.is_finite() {
+            // Standard + finite: numeric output
             write!(writer, "{}", value)?;
             Ok(())
+        } else {
+            // Standard + not finite: quote
+            write_quoted(writer)
         }
     }
 
     #[inline]
-    fn write_double<W: fmt::Write>(&mut self, value: f64, writer: &mut W) -> FormatResult<()> {
-        write!(writer, "{}", value)?;
-        Ok(())
+    fn write_double<W: Write>(&mut self, value: f64, writer: &mut W) -> FormatResult<()> {
+        let value = FloatingFormat(value);
+        let write_quoted = |w: &mut W| {
+            write!(w, r#""{}""#, value)?;
+            Ok(())
+        };
+
+        if value.is_finite() {
+            // finite: numeric output
+            write!(writer, "{}", value)?;
+            Ok(())
+        } else if self.extended() {
+            // Extended + not finite: wrap
+            self.write_extended_object(writer, DOUBLE_EXTENDED_NAME, write_quoted)
+        } else {
+            // Standard + not finite: quote
+            write_quoted(writer)
+        }
     }
 
     #[inline]

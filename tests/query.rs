@@ -978,10 +978,10 @@ mod test_queried_value_format_to {
         assert_queried_value_extended(
             input,
             "$.float",
-            r#"{"$numberFloat":"123.456"}"#,
-            "{\n  \"$numberFloat\" : \"123.456\"\n}",
+            r#"{"$numberFloat":"123.456001"}"#,
+            "{\n  \"$numberFloat\" : \"123.456001\"\n}",
         );
-        assert_queried_value_extended(input, "$.double", "12.3456789", "12.3456789");
+        assert_queried_value_extended(input, "$.double", "12.345678899999999", "12.345678899999999");
         assert_queried_value_extended(
             input,
             "$.binary",

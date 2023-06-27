@@ -186,10 +186,49 @@ fn test_scalar_ext_numeric_fmt() {
     );
     assert_extended_scalar_fmt(
         r#"{"$numberFloat": 123.4567}"#,
-        r#"{"$numberFloat":"123.4567"}"#,
-        "{\n  \"$numberFloat\" : \"123.4567\"\n}",
+        r#"{"$numberFloat":"123.456703"}"#,
+        "{\n  \"$numberFloat\" : \"123.456703\"\n}",
     );
-    assert_extended_scalar_fmt(r#"{"$numberDouble": 12.3456789}"#, r#"12.3456789"#, r#"12.3456789"#);
+    assert_extended_scalar_fmt(
+        r#"{"$numberFloat": 8.9345678e3}"#,
+        r#"{"$numberFloat":"8934.56738"}"#,
+        "{\n  \"$numberFloat\" : \"8934.56738\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberFloat": "naN"}"#,
+        r#"{"$numberFloat":"Nan"}"#,
+        "{\n  \"$numberFloat\" : \"Nan\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberFloat": "+inf"}"#,
+        r#"{"$numberFloat":"Inf"}"#,
+        "{\n  \"$numberFloat\" : \"Inf\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberFloat": "-infinity"}"#,
+        r#"{"$numberFloat":"-Inf"}"#,
+        "{\n  \"$numberFloat\" : \"-Inf\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberDouble": 12.3456789}"#,
+        r#"12.345678899999999"#,
+        r#"12.345678899999999"#,
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberDouble": "naN"}"#,
+        r#"{"$numberDouble":"Nan"}"#,
+        "{\n  \"$numberDouble\" : \"Nan\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberDouble": "+inf"}"#,
+        r#"{"$numberDouble":"Inf"}"#,
+        "{\n  \"$numberDouble\" : \"Inf\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$numberDouble": "-infinity"}"#,
+        r#"{"$numberDouble":"-Inf"}"#,
+        "{\n  \"$numberDouble\" : \"-Inf\"\n}",
+    );
     assert_extended_scalar_fmt(r#"{"$numberDecimal": 127}"#, r#"127"#, r#"127"#);
     assert_extended_scalar_fmt(
         r#"{"$numberDecimal": 12.3456789}"#,
@@ -373,11 +412,11 @@ fn test_compact_fmt() {
         );
         assert_extended_compact_fmt(
             r#"{"$numberByte": "123", "$numberShort": "12345", "$numberInt": 1234567, "$numberLong": 1234567890, "$numberDecimal": "12.3456789", "$numberFloat": 123.456, "$numberDouble": 12.3456789}"#,
-            r#"{"$numberInt":1234567,"$numberByte":"123","$numberLong":1234567890,"$numberFloat":123.456,"$numberShort":"12345","$numberDouble":12.3456789,"$numberDecimal":"12.3456789"}"#,
+            r#"{"$numberInt":1234567,"$numberByte":"123","$numberLong":1234567890,"$numberFloat":123.456,"$numberShort":"12345","$numberDouble":12.345678899999999,"$numberDecimal":"12.3456789"}"#,
         );
         assert_extended_compact_fmt(
             r#"{ "tinyint": {"$numberByte": "123"}, "smallint": {"$numberShort": "12345"}, "integer":{"$numberInt": 1234567}, "bigint": {"$numberLong": 1234567890}, "number": {"$numberDecimal": "12.3456789"}, "float":{"$numberFloat": 123.456}, "double": {"$numberDouble": 12.3456789}}"#,
-            r#"{"float":{"$numberFloat":"123.456"},"bigint":1234567890,"double":12.3456789,"number":{"$numberDecimal":"12.3456789"},"integer":1234567,"tinyint":123,"smallint":12345}"#,
+            r#"{"float":{"$numberFloat":"123.456001"},"bigint":1234567890,"double":12.345678899999999,"number":{"$numberDecimal":"12.3456789"},"integer":1234567,"tinyint":123,"smallint":12345}"#,
         );
         assert_extended_compact_fmt(
             r#"{ "bin2": {"$binary": "aGVsbG8h"}, "bin1": {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}}"#,
@@ -404,7 +443,7 @@ fn test_compact_fmt() {
         );
         assert_extended_compact_fmt(
             r#"[{"$numberByte": "123"}, {"$numberShort": "12345"}, {"$numberInt": 1234567}, {"$numberLong": 1234567890}, {"$numberDecimal": "12.3456789"}, {"$numberFloat": 123.456}, {"$numberDouble": 12.3456789}]"#,
-            r#"[123,12345,1234567,1234567890,{"$numberDecimal":"12.3456789"},{"$numberFloat":"123.456"},12.3456789]"#,
+            r#"[123,12345,1234567,1234567890,{"$numberDecimal":"12.3456789"},{"$numberFloat":"123.456001"},12.345678899999999]"#,
         );
         assert_extended_compact_fmt(
             r#"[{"$binary": "aGVsbG8h"}, {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}]"#,
@@ -441,11 +480,11 @@ fn test_pretty_fmt() {
         );
         assert_extended_pretty_fmt(
             r#"{"$numberByte": "123", "$numberShort": "12345", "$numberInt": 1234567, "$numberLong": 1234567890, "$numberDecimal": "12.3456789", "$numberFloat": 123.456, "$numberDouble": 12.3456789}"#,
-            "{\n  \"$numberInt\" : 1234567,\n  \"$numberByte\" : \"123\",\n  \"$numberLong\" : 1234567890,\n  \"$numberFloat\" : 123.456,\n  \"$numberShort\" : \"12345\",\n  \"$numberDouble\" : 12.3456789,\n  \"$numberDecimal\" : \"12.3456789\"\n}",
+            "{\n  \"$numberInt\" : 1234567,\n  \"$numberByte\" : \"123\",\n  \"$numberLong\" : 1234567890,\n  \"$numberFloat\" : 123.456,\n  \"$numberShort\" : \"12345\",\n  \"$numberDouble\" : 12.345678899999999,\n  \"$numberDecimal\" : \"12.3456789\"\n}",
         );
         assert_extended_pretty_fmt(
             r#"{ "tinyint": {"$numberByte": "123"}, "smallint": {"$numberShort": "12345"}, "integer":{"$numberInt": 1234567}, "bigint": {"$numberLong": 1234567890}, "number": {"$numberDecimal": "12.3456789"}, "float":{"$numberFloat": 123.456}, "double": {"$numberDouble": 12.3456789}}"#,
-            "{\n  \"float\" : {\n    \"$numberFloat\" : \"123.456\"\n  },\n  \"bigint\" : 1234567890,\n  \"double\" : 12.3456789,\n  \"number\" : {\n    \"$numberDecimal\" : \"12.3456789\"\n  },\n  \"integer\" : 1234567,\n  \"tinyint\" : 123,\n  \"smallint\" : 12345\n}",
+            "{\n  \"float\" : {\n    \"$numberFloat\" : \"123.456001\"\n  },\n  \"bigint\" : 1234567890,\n  \"double\" : 12.345678899999999,\n  \"number\" : {\n    \"$numberDecimal\" : \"12.3456789\"\n  },\n  \"integer\" : 1234567,\n  \"tinyint\" : 123,\n  \"smallint\" : 12345\n}",
         );
         assert_extended_pretty_fmt(
             r#"{ "bin2": {"$binary": "aGVsbG8h"}, "bin1": {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}}"#,
@@ -478,7 +517,7 @@ fn test_pretty_fmt() {
         );
         assert_extended_pretty_fmt(
             r#"[{"$numberByte": "123"}, {"$numberShort": "12345"}, {"$numberInt": 1234567}, {"$numberLong": 1234567890}, {"$numberDecimal": "12.3456789"}, {"$numberFloat": 123.456}, {"$numberDouble": 12.3456789}]"#,
-            "[\n  123,\n  12345,\n  1234567,\n  1234567890,\n  {\n    \"$numberDecimal\" : \"12.3456789\"\n  },\n  {\n    \"$numberFloat\" : \"123.456\"\n  },\n  12.3456789\n]",
+            "[\n  123,\n  12345,\n  1234567,\n  1234567890,\n  {\n    \"$numberDecimal\" : \"12.3456789\"\n  },\n  {\n    \"$numberFloat\" : \"123.456001\"\n  },\n  12.345678899999999\n]",
         );
         assert_extended_pretty_fmt(
             r#"[{"$binary": "aGVsbG8h"}, {"$binary": { "base64": "SmF2YVNjcmlwdA==", "subType": 0 }}]"#,
