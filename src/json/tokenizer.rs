@@ -293,17 +293,8 @@ impl<'a> Tokenizer<'a> {
         self.advance();
 
         // read - or +, 0..9 do nothing
-        match self.peek() {
-            Some(b'+' | b'-') => {
-                self.advance();
-            }
-            Some(b'0'..=b'9') => {}
-            Some(_) => {
-                return Err(self.error(ErrorCode::InvalidNumber));
-            }
-            None => {
-                return Err(self.peek_error(ErrorCode::EofWhileParsingValue));
-            }
+        if let Some(b'+' | b'-') = self.peek() {
+            self.advance();
         }
 
         match self.peek() {
