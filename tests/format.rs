@@ -267,6 +267,11 @@ fn test_scalar_binary_fmt() {
         true,
         false,
     );
+
+    // length = 4k + 1, invalid input
+    assert_fmt(r#"{"$binary": " "}"#, r#"{"$binary":" "}"#, false, true, false);
+    // length = 4k + 1, valid input
+    assert_fmt(r#"{"$binary": "X"}"#, r#""""#, false, true, false);
 }
 
 #[test]

@@ -130,10 +130,11 @@ pub fn decode(input: &[u8], output: &mut [u8]) -> Result<usize, DecodeError> {
             let (c0, c1) = (rem_bytes[0], rem_bytes[1]);
             output[i] = (decode_byte(c0)? << 2) as u8 | (decode_byte(c1)? >> 4) as u8;
             i += 1;
+        } else if INVALID_VALUE == DECODE_TABLE[rem_bytes[0] as usize] {
+            // When "aaaab", and *only if* "b" is a valid base64 character, last "b" is useless and discarded.
+            // Compatibility with Oracle & Mongo.  Called "Lax" decoding in yason.
+            return Err(DecodeError::InvalidByte(rem_bytes[0]));
         }
-
-        // When "aaaab", last "b" is useless and discarded.  Compatibility with Oracle & Mongo.  Called "Lax"
-        // decoding in yason.
     }
 
     Ok(i)
