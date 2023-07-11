@@ -20,7 +20,7 @@ const MAX_NESTED_DEPTH: usize = 100;
 #[derive(Debug)]
 pub enum NumberError {
     Overflow,
-    FormatError,
+    Invalid,
 }
 
 impl Display for NumberError {
@@ -28,7 +28,7 @@ impl Display for NumberError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             NumberError::Overflow => write!(f, "numeric overflow"),
-            NumberError::FormatError => write!(f, "an error occurred when formatting a number"),
+            NumberError::Invalid => write!(f, "invalid number"),
         }
     }
 }

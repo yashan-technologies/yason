@@ -245,6 +245,26 @@ fn test_scalar_ext_numeric_fmt() {
         r#"{"$numberLong":"9007199254740992"}"#,
         "{\n  \"$numberLong\" : \"9007199254740992\"\n}",
     );
+
+    // test type selection for literal numbers
+    assert_extended_scalar_fmt("9007199254740991", "9007199254740991", "9007199254740991");
+    assert_extended_scalar_fmt("9007199254740991.0", "9007199254740991", "9007199254740991");
+    assert_extended_scalar_fmt("9007199254740991e0", "9007199254740991", "9007199254740991");
+    assert_extended_scalar_fmt(
+        "9007199254740992",
+        r#"{"$numberLong":"9007199254740992"}"#,
+        "{\n  \"$numberLong\" : \"9007199254740992\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        "9007199254740992.0",
+        r#"{"$numberLong":"9007199254740992"}"#,
+        "{\n  \"$numberLong\" : \"9007199254740992\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        "9007199254740992e0",
+        r#"{"$numberLong":"9007199254740992"}"#,
+        "{\n  \"$numberLong\" : \"9007199254740992\"\n}",
+    );
 }
 
 #[test]

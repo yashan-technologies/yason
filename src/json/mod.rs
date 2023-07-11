@@ -46,7 +46,7 @@ impl Yason {
                 let decimal = number2decimal(val)?;
                 if extended {
                     if decimal.has_fract() {
-                        Scalar::double_with_vec(f64::from(decimal), bytes)
+                        Scalar::double_with_vec(number2f64(val)?, bytes)
                     } else if let Ok(i) = i64::try_from(decimal) {
                         if i >= i8::MIN as i64 && i <= i8::MAX as i64 {
                             Scalar::tinyint_with_vec(i as i8, bytes)
@@ -100,7 +100,7 @@ fn write_array<T: ArrBuilder>(builder: &mut T, array: &[Value], extended: bool) 
                 let decimal = number2decimal(val)?;
                 if extended {
                     if decimal.has_fract() {
-                        builder.push_double(f64::from(decimal))?;
+                        builder.push_double(number2f64(val)?)?;
                     } else if let Ok(i) = i64::try_from(decimal) {
                         if i >= i8::MIN as i64 && i <= i8::MAX as i64 {
                             builder.push_tinyint(i as i8)?;
@@ -154,7 +154,7 @@ fn write_object<T: ObjBuilder>(builder: &mut T, object: &Map<Cow<str>, Value>, e
                 let decimal = number2decimal(val)?;
                 if extended {
                     if decimal.has_fract() {
-                        builder.push_double(key, f64::from(decimal))?;
+                        builder.push_double(key, number2f64(val)?)?;
                     } else if let Ok(i) = i64::try_from(decimal) {
                         if i >= i8::MIN as i64 && i <= i8::MAX as i64 {
                             builder.push_tinyint(key, i as i8)?;
@@ -538,6 +538,11 @@ fn number2decimal(val: value::Number) -> BuildResult<Number> {
         },
         Ok,
     )
+}
+
+#[inline]
+fn number2f64(val: value::Number) -> BuildResult<f64> {
+    val.parse().map_err(|_| BuildError::NumberError(NumberError::Invalid))
 }
 
 #[cfg(test)]
