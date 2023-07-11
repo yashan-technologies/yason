@@ -335,6 +335,21 @@ fn test_scalar_timestamp_fmt() {
         r#"{"$oracleTimestamp":"9999-12-30T23:59:59.9999999999"}"#,
         "{\n  \"$oracleTimestamp\" : \"9999-12-30T23:59:59.9999999999\"\n}",
     );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleTimestamp": "9999-12-31 23:59:59.999999"}"#,
+        r#"{"$yashanTimestamp":"9999-12-31T23:59:59.999999"}"#,
+        "{\n  \"$yashanTimestamp\" : \"9999-12-31T23:59:59.999999\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleTimestamp": " "}"#,
+        r#"{"$oracleTimestamp":" "}"#,
+        "{\n  \"$oracleTimestamp\" : \" \"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleTimestamp": ""}"#,
+        r#"{"$oracleTimestamp":""}"#,
+        "{\n  \"$oracleTimestamp\" : \"\"\n}",
+    );
 }
 
 #[test]
@@ -381,6 +396,21 @@ fn test_scalar_date_fmt() {
         r#"{"$oracleDate":"9999-12-31T23:59:59.9999999999"}"#,
         "{\n  \"$oracleDate\" : \"9999-12-31T23:59:59.9999999999\"\n}",
     );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleDate": "9999-12-31 23:59:59.999999"}"#,
+        r#"{"$yashanDate":"9999-12-31T23:59:59"}"#,
+        "{\n  \"$yashanDate\" : \"9999-12-31T23:59:59\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleDate": " "}"#,
+        r#"{"$oracleDate":" "}"#,
+        "{\n  \"$oracleDate\" : \" \"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$oracleDate": ""}"#,
+        r#"{"$oracleDate":""}"#,
+        "{\n  \"$oracleDate\" : \"\"\n}",
+    );
 }
 
 #[test]
@@ -394,6 +424,16 @@ fn test_scalar_time_fmt() {
         r#"{"$yashanTime": "16:50:20.123"}"#,
         r#"{"$yashanTime":"16:50:20.123000"}"#,
         "{\n  \"$yashanTime\" : \"16:50:20.123000\"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTime": " "}"#,
+        r#"{"$yashanTime":" "}"#,
+        "{\n  \"$yashanTime\" : \" \"\n}",
+    );
+    assert_extended_scalar_fmt(
+        r#"{"$yashanTime": ""}"#,
+        r#"{"$yashanTime":""}"#,
+        "{\n  \"$yashanTime\" : \"\"\n}",
     );
 }
 
