@@ -59,11 +59,14 @@ pub enum ErrorCode {
     /// Unexpected end of hex escape.
     UnexpectedEndOfHexEscape,
 
-    // alloc vec failed
+    /// alloc vec failed
     TryReserveError,
 
-    // string from utf8 failed
+    /// string from utf8 failed
     FromUtf8Error,
+
+    /// Out of children counts of object/array
+    TooManyChildren,
 }
 
 impl JsonParseError {
@@ -102,6 +105,7 @@ impl Display for ErrorCode {
             ErrorCode::ControlCharacterWhileParsingString => {
                 f.write_str("control character (\\u0000-\\u001F) found while parsing a string")
             }
+            ErrorCode::TooManyChildren => f.write_str("too many children in the current object or array"),
         }
     }
 }

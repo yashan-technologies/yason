@@ -8,6 +8,8 @@ use super::{
     value::Value,
 };
 
+const MAX_ITEM_COUNT: u16 = u16::MAX;
+
 pub(crate) struct Parser<'a> {
     tokenizer: Tokenizer<'a>,
 }
@@ -69,6 +71,9 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 Token::Comma => {
+                    if array.len() >= MAX_ITEM_COUNT as usize {
+                        return Err(self.error(ErrorCode::TooManyChildren));
+                    }
                     array.try_reserve(1)?;
                     array.push(self.parse()?);
                 }
@@ -141,6 +146,9 @@ impl<'a> Parser<'a> {
         let token = self.step()?;
         let v = self.parse_from(token)?;
 
+        if object.len() >= MAX_ITEM_COUNT as usize {
+            return Err(self.error(ErrorCode::TooManyChildren));
+        }
         // TODO: OOM panic
         object.insert(k, v);
 
