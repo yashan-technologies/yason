@@ -1,8 +1,7 @@
 //! YASON extended types
 
 use crate::DataType;
-use sqldatetime::Formatter;
-use std::sync::OnceLock;
+use sqldatetime::{Formatter, OracleDate, Time, Timestamp};
 
 pub const EXTENDED_NAME_PREFIX: u8 = b'$';
 pub const NUMBER_EXTENDED_NAME: &str = "$numberDecimal";
@@ -43,20 +42,17 @@ pub const EXTENDED_NAME_TYPES: [(&str, DataType); 13] = [
 
 #[inline]
 pub fn timestamp_formatter() -> &'static Formatter {
-    static TIMESTAMP_FORMATTER: OnceLock<Formatter> = OnceLock::new();
-    TIMESTAMP_FORMATTER.get_or_init(|| Formatter::try_new("YYYY-MM-DDTHH24:MI:SS.FF").unwrap())
+    Timestamp::iso8601_formatter()
 }
 
 #[inline]
 pub fn date_formatter() -> &'static Formatter {
-    static DATE_FORMATTER: OnceLock<Formatter> = OnceLock::new();
-    DATE_FORMATTER.get_or_init(|| Formatter::try_new("YYYY-MM-DDTHH24:MI:SS.FF").unwrap())
+    OracleDate::iso8601_formatter()
 }
 
 #[inline]
 pub fn time_formatter() -> &'static Formatter {
-    static TIME_FORMATTER: OnceLock<Formatter> = OnceLock::new();
-    TIME_FORMATTER.get_or_init(|| Formatter::try_new("THH24:MI:SS.FF").unwrap())
+    Time::iso8601_formatter()
 }
 
 #[cfg(test)]

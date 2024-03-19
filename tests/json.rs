@@ -55,19 +55,24 @@ fn assert_scalar_inner(input: &str, expected: &str, expected_type: DataType, ext
             assert_eq!(yason.data_type().unwrap(), DataType::Timestamp);
             assert_eq!(
                 yason.timestamp().unwrap(),
-                Timestamp::parse(expected, "YYYY-MM-DDTHH24:MI:SS.FF").unwrap()
+                Timestamp::iso8601_formatter()
+                    .parse::<&str, Timestamp>(expected)
+                    .unwrap()
             );
         }
         DataType::Date => {
             assert_eq!(yason.data_type().unwrap(), DataType::Date);
             assert_eq!(
                 yason.date().unwrap(),
-                Date::parse(expected, "YYYY-MM-DDTHH24:MI:SS.FF").unwrap()
+                Date::iso8601_formatter().parse::<&str, Date>(expected).unwrap()
             );
         }
         DataType::Time => {
             assert_eq!(yason.data_type().unwrap(), DataType::Time);
-            assert_eq!(yason.time().unwrap(), Time::parse(expected, "THH24:MI:SS.FF").unwrap());
+            assert_eq!(
+                yason.time().unwrap(),
+                Time::iso8601_formatter().parse::<&str, Time>(expected).unwrap()
+            );
         }
         DataType::Object => unreachable!(),
         DataType::Array => unreachable!(),
