@@ -70,7 +70,7 @@ impl<T: Floating> Deref for FloatingFormat<T> {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg_attr(target_os = "windows", link(name = "legacy_stdio_definitions"))]
 extern "C" {
     fn snprintf(s: *mut c_char, n: usize,
                     format: *const c_char, ...) -> c_int;
