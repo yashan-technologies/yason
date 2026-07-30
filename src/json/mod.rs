@@ -19,7 +19,7 @@ use std::str::FromStr;
 use value::{Map, Value};
 
 #[inline]
-fn from_str(s: &str) -> Result<Value> {
+fn from_str(s: &str) -> Result<Value<'_>> {
     let mut parser = parser::Parser::new(s);
     parser.parse_str()
 }
@@ -505,7 +505,7 @@ where
     use crate::base64::*;
 
     let decoded_len = decoded_len_estimate(value.len());
-    let mut buf = Vec::try_with_capacity(decoded_len)?;
+    let mut buf = <Vec<u8> as VecExt>::try_with_capacity(decoded_len)?;
     unsafe { buf.set_len(decoded_len) };
     if let Ok(len) = decode(value.as_bytes(), &mut buf[..]) {
         f(&buf[..len])?;

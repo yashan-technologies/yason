@@ -95,7 +95,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
-    fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<InnerObjectBuilder<&mut Vec<u8>>> {
+    fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<InnerObjectBuilder<'_, &mut Vec<u8>>> {
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
             bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
             Ok(())
@@ -107,7 +107,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
-    fn push_array(&mut self, element_count: u16) -> BuildResult<InnerArrayBuilder<&mut Vec<u8>>> {
+    fn push_array(&mut self, element_count: u16) -> BuildResult<InnerArrayBuilder<'_, &mut Vec<u8>>> {
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
             bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
             Ok(())
@@ -300,7 +300,7 @@ impl ArrayBuilder<'_> {
     /// Creates `ArrayBuilder` with specified element count.
     #[inline]
     pub fn try_new(element_count: u16) -> BuildResult<Self> {
-        let bytes = Vec::try_with_capacity(DEFAULT_SIZE)?;
+        let bytes = <Vec<u8> as VecExt>::try_with_capacity(DEFAULT_SIZE)?;
         let builder = InnerArrayBuilder::try_new(bytes, element_count, Depth::new())?;
         Ok(Self(builder))
     }
@@ -344,10 +344,10 @@ impl<'a> ArrayRefBuilder<'a> {
 
 pub trait ArrBuilder {
     /// Pushes an embedded object with specified element count and a flag which indicates whether the embedded object is sorted by key.
-    fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder>;
+    fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder<'_>>;
 
     /// Pushes an embedded array with specified element count.
-    fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder>;
+    fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder<'_>>;
 
     /// Pushes a string value.
     fn push_string<Val: AsRef<str>>(&mut self, value: Val) -> BuildResult<&mut Self>;
@@ -396,14 +396,14 @@ macro_rules! impl_push_methods {
     ($v: vis,) => {
         /// Pushes an embedded object with specified element count and a flag which indicates whether the embedded object is sorted by key.
         #[inline]
-        $v fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder> {
+        $v fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<ObjectRefBuilder<'_>> {
             let obj_builder = self.0.push_object(element_count, key_sorted)?;
             Ok(ObjectRefBuilder(obj_builder))
         }
 
         /// Pushes an embedded array with specified element count.
         #[inline]
-        $v fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder> {
+        $v fn push_array(&mut self, element_count: u16) -> BuildResult<ArrayRefBuilder<'_>> {
             let array_builder = self.0.push_array(element_count)?;
             Ok(ArrayRefBuilder(array_builder))
         }

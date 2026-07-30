@@ -168,26 +168,26 @@ impl Yason {
 
     /// If `Yason` is `Object`, return its value. Returns `YasonError` otherwise.
     #[inline]
-    pub fn object(&self) -> YasonResult<Object> {
+    pub fn object(&self) -> YasonResult<Object<'_>> {
         self.check_type(0, DataType::Object)?;
         unsafe { self.object_unchecked() }
     }
 
     #[inline]
-    pub(crate) unsafe fn object_unchecked(&self) -> YasonResult<Object> {
+    pub(crate) unsafe fn object_unchecked(&self) -> YasonResult<Object<'_>> {
         debug_assert!(self.data_type()? == DataType::Object);
         Ok(Object::new_unchecked(self))
     }
 
     /// If `Yason` is `Array`, return its value. Returns `YasonError` otherwise.
     #[inline]
-    pub fn array(&self) -> YasonResult<Array> {
+    pub fn array(&self) -> YasonResult<Array<'_>> {
         self.check_type(0, DataType::Array)?;
         unsafe { self.array_unchecked() }
     }
 
     #[inline]
-    pub(crate) unsafe fn array_unchecked(&self) -> YasonResult<Array> {
+    pub(crate) unsafe fn array_unchecked(&self) -> YasonResult<Array<'_>> {
         debug_assert!(self.data_type()? == DataType::Array);
         Ok(Array::new_unchecked(self))
     }
@@ -501,14 +501,14 @@ impl Yason {
     }
 
     #[inline]
-    fn read_object(&self, index: usize) -> YasonResult<Object> {
+    fn read_object(&self, index: usize) -> YasonResult<Object<'_>> {
         let size = self.read_i32(index + DATA_TYPE_SIZE)? as usize + DATA_TYPE_SIZE + OBJECT_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.slice(index, size + index)?) };
         Ok(unsafe { Object::new_unchecked(yason) })
     }
 
     #[inline]
-    fn read_array(&self, index: usize) -> YasonResult<Array> {
+    fn read_array(&self, index: usize) -> YasonResult<Array<'_>> {
         let size = self.read_i32(index + DATA_TYPE_SIZE)? as usize + DATA_TYPE_SIZE + ARRAY_SIZE;
         let yason = unsafe { Yason::new_unchecked(self.slice(index, size + index)?) };
         Ok(unsafe { Array::new_unchecked(yason) })

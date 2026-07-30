@@ -69,7 +69,7 @@ impl<'a> Value<'a> {
     }
 
     #[inline]
-    pub fn as_array(&self) -> Option<&Vec<Value>> {
+    pub fn as_array(&self) -> Option<&Vec<Value<'_>>> {
         match self {
             Value::Array(arr) => Some(arr),
             _ => None,
@@ -82,7 +82,7 @@ impl<'a> Value<'a> {
     }
 
     #[inline]
-    pub fn as_object(&self) -> Option<&BTreeMap<Cow<str>, Value>> {
+    pub fn as_object(&self) -> Option<&BTreeMap<Cow<'_, str>, Value<'_>>> {
         match self {
             Value::Object(object) => Some(object),
             _ => None,

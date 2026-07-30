@@ -645,7 +645,7 @@ fn format_binary_to_base64<W: fmt::Write>(value: &[u8], writer: &mut W) -> Forma
     use crate::base64::*;
 
     let encoded_len = encoded_len(value.len());
-    let mut buf = Vec::try_with_capacity(encoded_len).map_err(YasonError::TryReserveError)?;
+    let mut buf = <Vec<u8> as VecExt>::try_with_capacity(encoded_len).map_err(YasonError::TryReserveError)?;
     unsafe { buf.set_len(encoded_len) };
     let len = encode(value, &mut buf[..]);
     debug_assert_eq!(encoded_len, len);

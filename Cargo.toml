@@ -3,7 +3,7 @@ name = "yason"
 version = "0.0.2"
 authors = ["David Li <davidli2010@foxmail.com>", "linbo <linbo.lin@qq.com>"]
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.88"
 readme = "README.md"
 license = "Apache-2.0"
 description = "Encoding and decoding support for YASON in Rust"
@@ -14,7 +14,7 @@ documentation = "https://docs.rs/yason/"
 
 [dependencies]
 decimal-rs = "0.1.44"
-sqldatetime = { version = "0.1.36", features = ["oracle"] }
+sqldatetime = { version = "0.1.38", features = ["oracle"] }
 serde = { version = "1.0.138", optional = true }
 
 [dev-dependencies]

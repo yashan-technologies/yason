@@ -176,7 +176,6 @@
 //! ```
 //!
 
-#![feature(once_cell)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[macro_use]

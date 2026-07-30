@@ -8,6 +8,8 @@ use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
 use crate::{BuildError, DataType, Date, Number, Time, Timestamp};
 use decimal_rs::MAX_BINARY_SIZE;
+use std::cmp::Ordering;
+use std::hint;
 use std::ptr;
 
 pub(crate) struct InnerObjectBuilder<'a, B: AsMut<Vec<u8>>> {
@@ -22,7 +24,7 @@ pub(crate) struct InnerObjectBuilder<'a, B: AsMut<Vec<u8>>> {
     total_nested_depth: Depth<'a>,
 }
 
-impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
+impl<'a, B: AsMut<Vec<u8>> + AsRef<Vec<u8>>> InnerObjectBuilder<'a, B> {
     #[inline]
     pub(crate) fn try_new(
         mut bytes: B,
@@ -68,19 +70,17 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
             return true;
         }
 
-        let begin = self.start_pos + ELEMENT_COUNT_SIZE;
-        let end = begin + self.element_count as usize * KEY_OFFSET_SIZE;
+        let bytes = self.bytes.as_ref();
+        let mut key_offsets = self.key_offset_iter();
+        let mut cur_key_offset = key_offsets.next().unwrap();
 
-        let bytes = self.bytes.as_mut();
-        let key_offsets_bytes = bytes[begin..end].as_mut_ptr() as *mut u32;
-        let key_offsets = unsafe { std::slice::from_raw_parts(key_offsets_bytes, (end - begin) / 4) };
-
-        for i in 0..key_offsets.len() - 1 {
-            let cur_key = Self::read_key_by_offset(bytes, key_offsets[i] as usize, self.start_pos);
-            let next_key = Self::read_key_by_offset(bytes, key_offsets[i + 1] as usize, self.start_pos);
+        for next_key_offset in key_offsets {
+            let cur_key = Self::read_key_by_offset(bytes, cur_key_offset, self.start_pos);
+            let next_key = Self::read_key_by_offset(bytes, next_key_offset, self.start_pos);
             if cur_key.len() > next_key.len() || (cur_key.len() == next_key.len() && cur_key > next_key) {
                 return false;
             }
+            cur_key_offset = next_key_offset;
         }
         true
     }
@@ -153,18 +153,59 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
         let begin = start_pos + ELEMENT_COUNT_SIZE;
         let end = begin + value_count * KEY_OFFSET_SIZE;
 
-        let key_offsets_bytes = bytes[begin..end].as_ptr() as *mut u32;
-        let key_offsets = unsafe { std::slice::from_raw_parts(key_offsets_bytes, (end - begin) / KEY_OFFSET_SIZE) };
-
-        let found = key_offsets.binary_search_by(|key_offset| {
-            let key = Self::read_key_by_offset(bytes, *key_offset as usize, start_pos);
+        let key_offsets = bytes[begin..end].as_ptr().cast::<u32>();
+        Self::key_offset_binary_search_by(key_offsets, value_count, |key_offset| {
+            let key = Self::read_key_by_offset(bytes, key_offset, start_pos);
             cmp_key(key, target)
-        });
+        })
+        .unwrap_or_else(|index| index)
+    }
 
-        match found {
-            Ok(v) => v,
-            Err(v) => v,
+    #[inline]
+    fn key_offset_binary_search_by<F>(key_offsets: *const u32, len: usize, mut f: F) -> Result<usize, usize>
+    where
+        F: FnMut(usize) -> Ordering,
+    {
+        if len == 0 {
+            return Err(0);
         }
+
+        let mut size = len;
+        let mut base = 0;
+        while size > 1 {
+            let half = size / 2;
+            let mid = base + half;
+            // SAFETY: `mid` is always less than `len`; the packed YASON offset table may be unaligned.
+            let key_offset = unsafe { u32::from_le(key_offsets.add(mid).read_unaligned()) } as usize;
+            let cmp = f(key_offset);
+
+            base = hint::select_unpredictable(cmp == Ordering::Greater, base, mid);
+            size -= half;
+        }
+
+        // SAFETY: `base` is always less than `len`.
+        let key_offset = unsafe { u32::from_le(key_offsets.add(base).read_unaligned()) } as usize;
+        let cmp = f(key_offset);
+        if cmp == Ordering::Equal {
+            // SAFETY: `base` is always less than `len`.
+            unsafe { hint::assert_unchecked(base < len) };
+            Ok(base)
+        } else {
+            let result = base + (cmp == Ordering::Less) as usize;
+            // SAFETY: `result` is at most `len`.
+            unsafe { hint::assert_unchecked(result <= len) };
+            Err(result)
+        }
+    }
+
+    #[inline]
+    fn key_offset_iter(&self) -> impl Iterator<Item = usize> + '_ {
+        let begin = self.start_pos + ELEMENT_COUNT_SIZE;
+        let end = begin + self.element_count as usize * KEY_OFFSET_SIZE;
+        let bytes = self.bytes.as_ref();
+        bytes[begin..end]
+            .chunks_exact(KEY_OFFSET_SIZE)
+            .map(|key_offset| u32::from_le_bytes(key_offset.try_into().unwrap()) as usize)
     }
 
     #[inline]
@@ -184,7 +225,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
         key: &str,
         element_count: u16,
         key_sorted: bool,
-    ) -> BuildResult<InnerObjectBuilder<&mut Vec<u8>>> {
+    ) -> BuildResult<InnerObjectBuilder<'_, &mut Vec<u8>>> {
         let size = key.len() + KEY_LENGTH_SIZE;
         self.push_key_value_by(key, size, |_| Ok(()))?;
         let bytes = self.bytes.as_mut();
@@ -192,7 +233,7 @@ impl<'a, B: AsMut<Vec<u8>>> InnerObjectBuilder<'a, B> {
     }
 
     #[inline]
-    fn push_array(&mut self, key: &str, element_count: u16) -> BuildResult<InnerArrayBuilder<&mut Vec<u8>>> {
+    fn push_array(&mut self, key: &str, element_count: u16) -> BuildResult<InnerArrayBuilder<'_, &mut Vec<u8>>> {
         let size = key.len() + KEY_LENGTH_SIZE;
         self.push_key_value_by(key, size, |_| Ok(()))?;
         let bytes = self.bytes.as_mut();
@@ -362,7 +403,7 @@ impl ObjectBuilder<'_> {
     /// `key_sorted` indicates whether the object is sorted by key.
     #[inline]
     pub fn try_new(element_count: u16, key_sorted: bool) -> BuildResult<Self> {
-        let bytes = Vec::try_with_capacity(DEFAULT_SIZE)?;
+        let bytes = <Vec<u8> as VecExt>::try_with_capacity(DEFAULT_SIZE)?;
         let builder = InnerObjectBuilder::try_new(bytes, element_count, key_sorted, Depth::new())?;
         Ok(Self(builder))
     }
@@ -404,10 +445,10 @@ pub trait ObjBuilder {
         key: Key,
         element_count: u16,
         key_sorted: bool,
-    ) -> BuildResult<ObjectRefBuilder>;
+    ) -> BuildResult<ObjectRefBuilder<'_>>;
 
     /// Pushes an embedded array with specified element count.
-    fn push_array<Key: AsRef<str>>(&mut self, key: Key, element_count: u16) -> BuildResult<ArrayRefBuilder>;
+    fn push_array<Key: AsRef<str>>(&mut self, key: Key, element_count: u16) -> BuildResult<ArrayRefBuilder<'_>>;
 
     /// Pushes a string value.
     fn push_string<Key: AsRef<str>, Val: AsRef<str>>(&mut self, key: Key, value: Val) -> BuildResult<&mut Self>;
@@ -461,7 +502,7 @@ macro_rules! impl_push_methods {
             key: Key,
             element_count: u16,
             key_sorted: bool,
-        ) -> BuildResult<ObjectRefBuilder> {
+        ) -> BuildResult<ObjectRefBuilder<'_>> {
             let key = key.as_ref();
             let obj_builder = self.0.push_object(key, element_count, key_sorted)?;
             Ok(ObjectRefBuilder(obj_builder))
@@ -469,7 +510,7 @@ macro_rules! impl_push_methods {
 
         /// Pushes an embedded array with specified element count.
         #[inline]
-        $v fn push_array<Key: AsRef<str>>(&mut self, key: Key, element_count: u16) -> BuildResult<ArrayRefBuilder> {
+        $v fn push_array<Key: AsRef<str>>(&mut self, key: Key, element_count: u16) -> BuildResult<ArrayRefBuilder<'_>> {
             let key = key.as_ref();
             let array_builder = self.0.push_array(key, element_count)?;
             Ok(ArrayRefBuilder(array_builder))
