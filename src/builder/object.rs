@@ -2,7 +2,7 @@
 
 use crate::binary::*;
 use crate::builder::array::{ArrayRefBuilder, InnerArrayBuilder};
-use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
+use crate::builder::{BuildResult, DEFAULT_SIZE, Depth, MAX_NESTED_DEPTH};
 use crate::util::cmp_key;
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};

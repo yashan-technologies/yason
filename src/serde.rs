@@ -66,4 +66,3 @@ impl<'de> serde::Deserialize<'de> for YasonBuf {
         }
     }
 }
-

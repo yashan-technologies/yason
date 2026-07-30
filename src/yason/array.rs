@@ -60,7 +60,7 @@ impl<'a> Array<'a> {
     #[inline]
     pub(crate) unsafe fn lazy_get_unchecked(&self, index: usize) -> YasonResult<LazyValue<'a, true>> {
         debug_assert!(index < self.len()?);
-        let (data_type, value_entry_pos) = self.read_type_and_value_entry_pos(index)?;
+        let (data_type, value_entry_pos) = unsafe { self.read_type_and_value_entry_pos(index)? };
         Ok(LazyValue::new(self.0, data_type, value_entry_pos))
     }
 
@@ -464,10 +464,6 @@ impl<'a> Iterator for LazyArrayIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.len {
-            Some(self.next())
-        } else {
-            None
-        }
+        if self.index < self.len { Some(self.next()) } else { None }
     }
 }

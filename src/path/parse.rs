@@ -1,7 +1,7 @@
 //! Path Parser.
 
 use crate::vec::VecExt;
-use crate::{util, PathExpression};
+use crate::{PathExpression, util};
 use std::collections::TryReserveError;
 use std::error::Error;
 use std::fmt::{Display, Formatter};

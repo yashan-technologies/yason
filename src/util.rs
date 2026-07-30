@@ -1,9 +1,9 @@
 //! Basic functions.
 
+use crate::YasonError;
 use crate::binary::MAX_DATA_LENGTH_SIZE;
 use crate::vec::VecExt;
 use crate::yason::YasonResult;
-use crate::YasonError;
 use std::cmp::Ordering;
 
 #[rustfmt::skip]

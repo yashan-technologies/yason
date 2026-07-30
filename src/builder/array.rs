@@ -2,7 +2,7 @@
 
 use crate::binary::*;
 use crate::builder::object::InnerObjectBuilder;
-use crate::builder::{BuildResult, Depth, DEFAULT_SIZE, MAX_NESTED_DEPTH};
+use crate::builder::{BuildResult, DEFAULT_SIZE, Depth, MAX_NESTED_DEPTH};
 use crate::vec::VecExt;
 use crate::yason::{Yason, YasonBuf};
 use crate::{BuildError, DataType, Date, Number, ObjectRefBuilder, Time, Timestamp};
@@ -95,7 +95,11 @@ impl<'a, B: AsMut<Vec<u8>>> InnerArrayBuilder<'a, B> {
     }
 
     #[inline]
-    fn push_object(&mut self, element_count: u16, key_sorted: bool) -> BuildResult<InnerObjectBuilder<'_, &mut Vec<u8>>> {
+    fn push_object(
+        &mut self,
+        element_count: u16,
+        key_sorted: bool,
+    ) -> BuildResult<InnerObjectBuilder<'_, &mut Vec<u8>>> {
         let f = |bytes: &mut Vec<u8>, offset: u32, value_entry_pos: usize| {
             bytes.write_offset(offset, value_entry_pos + DATA_TYPE_SIZE);
             Ok(())
@@ -337,7 +341,7 @@ impl<'a> ArrayRefBuilder<'a> {
     pub(crate) unsafe fn push_object_or_array(&mut self, yason: &Yason, data_type: DataType) -> BuildResult<&mut Self> {
         debug_assert!(matches!(yason.data_type().unwrap(), DataType::Object | DataType::Array));
         debug_assert!(yason.data_type().unwrap() == data_type);
-        self.0.push_object_or_array(yason, data_type)?;
+        unsafe { self.0.push_object_or_array(yason, data_type)? };
         Ok(self)
     }
 }

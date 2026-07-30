@@ -215,10 +215,10 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn get_number_from_interval(&self, start: usize, end: usize) -> Result<&'a str> {
-        if let Some(n) = self.source.get_interval(start, end) {
-            if let Ok(s) = std::str::from_utf8(n) {
-                return Ok(s);
-            }
+        if let Some(n) = self.source.get_interval(start, end)
+            && let Ok(s) = std::str::from_utf8(n)
+        {
+            return Ok(s);
         }
 
         Err(self.error(ErrorCode::InvalidNumber))

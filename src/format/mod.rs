@@ -234,10 +234,10 @@ pub trait Formatter {
     #[inline]
     fn write_number<W: fmt::Write>(&mut self, value: &Number, writer: &mut W) -> FormatResult<()> {
         if self.extended() {
-            if !value.has_fract() {
-                if let Ok(i) = i64::try_from(value) {
-                    return self.write_bigint(i, writer);
-                }
+            if !value.has_fract()
+                && let Ok(i) = i64::try_from(value)
+            {
+                return self.write_bigint(i, writer);
             }
 
             self.write_extended_object(writer, NUMBER_EXTENDED_NAME, |mut w| {

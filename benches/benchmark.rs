@@ -1,6 +1,6 @@
 //! yason benchmark
 
-use bencher::{benchmark_group, benchmark_main, black_box, Bencher};
+use bencher::{Bencher, benchmark_group, benchmark_main, black_box};
 use std::cmp::Ordering;
 use std::str::FromStr;
 use yason::{Array, ArrayRefBuilder, Number, Object, ObjectRefBuilder, PathExpression, Yason, YasonBuf};
@@ -42,7 +42,7 @@ fn bench_push_null(bench: &mut Bencher) {
     })
 }
 
-fn create_object(bytes: &mut Vec<u8>) -> Object {
+fn create_object(bytes: &mut Vec<u8>) -> Object<'_> {
     bytes.clear();
     let mut builder = ObjectRefBuilder::try_new(bytes, 6, true).unwrap();
     // {key1: string, key2: 123, key3: true: key4: null, key5: [abc, false], key6: {key: true}}
@@ -112,7 +112,7 @@ fn bench_object_read_object(bench: &mut Bencher) {
     })
 }
 
-fn create_array(bytes: &mut Vec<u8>) -> Array {
+fn create_array(bytes: &mut Vec<u8>) -> Array<'_> {
     bytes.clear();
     let mut builder = ArrayRefBuilder::try_new(bytes, 6).unwrap();
     // [string, 123, true, null, [abc, false], {key: true}]

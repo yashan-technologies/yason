@@ -1,8 +1,8 @@
 //! PrettyFormatter
 
+use crate::DataType;
 use crate::format::{FormatResult, Formatter, WriteExt};
 use crate::yason::LazyValue;
-use crate::DataType;
 use std::fmt;
 
 struct PrettyOptions<'a> {

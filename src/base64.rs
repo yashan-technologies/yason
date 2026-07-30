@@ -25,11 +25,7 @@ const fn build_decode_table() -> [u8; 256] {
 pub const fn encoded_len(input_len: usize) -> usize {
     let len = input_len / ENCODE_CHUNK_SIZE * DECODE_CHUNK_SIZE;
     let rem = input_len % ENCODE_CHUNK_SIZE;
-    if rem > 0 {
-        len + DECODE_CHUNK_SIZE
-    } else {
-        len
-    }
+    if rem > 0 { len + DECODE_CHUNK_SIZE } else { len }
 }
 
 #[inline]

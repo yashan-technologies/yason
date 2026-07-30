@@ -419,19 +419,19 @@ impl<'a> Object<'a> {
 
     #[inline]
     unsafe fn read_nth_value_pos(&self, index: usize) -> YasonResult<usize> {
-        let key_offset = self.nth_key_offset(index)?;
+        let key_offset = unsafe { self.nth_key_offset(index)? };
         self.skip_key(key_offset as usize)
     }
 
     #[inline]
     unsafe fn read_nth_key_and_value_pos(&self, index: usize) -> YasonResult<(&'a str, usize)> {
-        let key_offset = self.nth_key_offset(index)?;
+        let key_offset = unsafe { self.nth_key_offset(index)? };
         self.read_key(key_offset as usize)
     }
 
     #[inline]
     unsafe fn read_nth_type_and_value_pos(&self, index: usize) -> YasonResult<(DataType, usize)> {
-        let value_pos = self.read_nth_value_pos(index)?;
+        let value_pos = unsafe { self.read_nth_value_pos(index)? };
         let data_type = self.0.read_type(value_pos)?;
         Ok((data_type, value_pos))
     }
@@ -528,11 +528,7 @@ impl<'a> Iterator for LazyObjectIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.len {
-            Some(self.next())
-        } else {
-            None
-        }
+        if self.index < self.len { Some(self.next()) } else { None }
     }
 }
 
@@ -624,10 +620,6 @@ impl<'a> Iterator for LazyObjectValueIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.len {
-            Some(self.next())
-        } else {
-            None
-        }
+        if self.index < self.len { Some(self.next()) } else { None }
     }
 }

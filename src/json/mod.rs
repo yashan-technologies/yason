@@ -482,13 +482,11 @@ where
                 return Ok(true);
             }
         }
-        Value::Object(obj) => {
-            if obj.len() == 2 && obj_has_valid_subtype(obj) {
-                if let Some(Value::String(str)) = obj.get(BINARY_BASE64_NAME) {
-                    if decode_base64(str, f)? {
-                        return Ok(true);
-                    }
-                }
+        Value::Object(obj) if obj.len() == 2 && obj_has_valid_subtype(obj) => {
+            if let Some(Value::String(str)) = obj.get(BINARY_BASE64_NAME)
+                && decode_base64(str, f)?
+            {
+                return Ok(true);
             }
         }
         _ => (), // ignore other types
@@ -517,12 +515,12 @@ where
 
 #[inline]
 fn obj_has_valid_subtype(obj: &Map<Cow<str>, Value>) -> bool {
-    if let Some(Value::Number(str)) = obj.get(BINARY_SUBTYPE_NAME) {
-        if let Ok(n) = number2decimal(str) {
-            if !n.has_fract() && u8::try_from(n).is_ok() {
-                return true;
-            }
-        }
+    if let Some(Value::Number(str)) = obj.get(BINARY_SUBTYPE_NAME)
+        && let Ok(n) = number2decimal(str)
+        && !n.has_fract()
+        && u8::try_from(n).is_ok()
+    {
+        return true;
     }
 
     false
@@ -578,7 +576,7 @@ mod test {
         let v = from_str(r#"[123, "1234", null, true, false]"#).unwrap();
         let array = v.as_array().unwrap();
 
-        assert_eq!("123", array.get(0).unwrap().as_number().unwrap());
+        assert_eq!("123", array.first().unwrap().as_number().unwrap());
         assert_eq!("1234", array.get(1).unwrap().as_str().unwrap());
         assert!(array.get(2).unwrap().is_null());
         assert!(array.get(3).unwrap().as_bool().unwrap());
@@ -587,7 +585,7 @@ mod test {
         let v = from_str(r#"["中国人", "Би Хятадын байна"]"#).unwrap();
         let array = v.as_array().unwrap();
 
-        assert_eq!("中国人", array.get(0).unwrap().as_str().unwrap());
+        assert_eq!("中国人", array.first().unwrap().as_str().unwrap());
         assert_eq!("Би Хятадын байна", array.get(1).unwrap().as_str().unwrap());
 
         let v = from_str(r#"[123, "1234", null, true, false,]"#);

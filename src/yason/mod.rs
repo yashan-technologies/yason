@@ -155,7 +155,7 @@ impl Yason {
     #[inline]
     pub unsafe fn new_unchecked<B: AsRef<[u8]> + ?Sized>(bytes: &B) -> &Yason {
         debug_assert!(!bytes.as_ref().is_empty());
-        &*(bytes.as_ref() as *const [u8] as *const Yason)
+        unsafe { &*(bytes.as_ref() as *const [u8] as *const Yason) }
     }
 
     #[inline]
@@ -185,7 +185,7 @@ impl Yason {
     #[inline]
     pub(crate) unsafe fn object_unchecked(&self) -> YasonResult<Object<'_>> {
         debug_assert!(self.data_type()? == DataType::Object);
-        Ok(Object::new_unchecked(self))
+        Ok(unsafe { Object::new_unchecked(self) })
     }
 
     /// If `Yason` is `Array`, return its value. Returns `YasonError` otherwise.
@@ -198,7 +198,7 @@ impl Yason {
     #[inline]
     pub(crate) unsafe fn array_unchecked(&self) -> YasonResult<Array<'_>> {
         debug_assert!(self.data_type()? == DataType::Array);
-        Ok(Array::new_unchecked(self))
+        Ok(unsafe { Array::new_unchecked(self) })
     }
 
     /// If `Yason` is `String`, return its value. Returns `YasonError` otherwise.
@@ -821,7 +821,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn object(&self) -> YasonResult<Object<'a>> {
         debug_assert!(self.ty == DataType::Object);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_object(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_object(self.value_pos)
         } else {
             self.yason.read_object(self.value_pos)
         }
@@ -831,7 +831,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn array(&self) -> YasonResult<Array<'a>> {
         debug_assert!(self.ty == DataType::Array);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_array(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_array(self.value_pos)
         } else {
             self.yason.read_array(self.value_pos)
         }
@@ -841,7 +841,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn string(&self) -> YasonResult<&'a str> {
         debug_assert!(self.ty == DataType::String);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_string(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_string(self.value_pos)
         } else {
             self.yason.read_string(self.value_pos)
         }
@@ -851,7 +851,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn binary(&self) -> YasonResult<&'a [u8]> {
         debug_assert!(self.ty == DataType::Binary);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_binary(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_binary(self.value_pos)
         } else {
             self.yason.read_binary(self.value_pos)
         }
@@ -861,7 +861,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn number(&self) -> YasonResult<Number> {
         debug_assert!(self.ty == DataType::Number);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_number(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_number(self.value_pos)
         } else {
             self.yason.read_number(self.value_pos)
         }
@@ -871,7 +871,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn bool(&self) -> YasonResult<bool> {
         debug_assert!(self.ty == DataType::Bool);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_bool(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_bool(self.value_pos)
         } else {
             self.yason.read_bool(self.value_pos)
         }
@@ -881,7 +881,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn tinyint(&self) -> YasonResult<i8> {
         debug_assert!(self.ty == DataType::Tinyint);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_tinyint(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_tinyint(self.value_pos)
         } else {
             self.yason.read_tinyint(self.value_pos)
         }
@@ -891,7 +891,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn smallint(&self) -> YasonResult<i16> {
         debug_assert!(self.ty == DataType::Smallint);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_smallint(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_smallint(self.value_pos)
         } else {
             self.yason.read_smallint(self.value_pos)
         }
@@ -901,7 +901,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn integer(&self) -> YasonResult<i32> {
         debug_assert!(self.ty == DataType::Integer);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_integer(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_integer(self.value_pos)
         } else {
             self.yason.read_integer(self.value_pos)
         }
@@ -911,7 +911,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn bigint(&self) -> YasonResult<i64> {
         debug_assert!(self.ty == DataType::Bigint);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_bigint(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_bigint(self.value_pos)
         } else {
             self.yason.read_bigint(self.value_pos)
         }
@@ -921,7 +921,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn float(&self) -> YasonResult<f32> {
         debug_assert!(self.ty == DataType::Float);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_float(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_float(self.value_pos)
         } else {
             self.yason.read_float(self.value_pos)
         }
@@ -931,7 +931,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn double(&self) -> YasonResult<f64> {
         debug_assert!(self.ty == DataType::Double);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_double(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_double(self.value_pos)
         } else {
             self.yason.read_double(self.value_pos)
         }
@@ -941,7 +941,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn timestamp(&self) -> YasonResult<Timestamp> {
         debug_assert!(self.ty == DataType::Timestamp);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_timestamp(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_timestamp(self.value_pos)
         } else {
             self.yason.read_timestamp(self.value_pos)
         }
@@ -951,7 +951,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn date(&self) -> YasonResult<Date> {
         debug_assert!(self.ty == DataType::Date);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_date(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_date(self.value_pos)
         } else {
             self.yason.read_date(self.value_pos)
         }
@@ -961,7 +961,7 @@ impl<'a, const IN_ARRAY: bool> LazyValue<'a, IN_ARRAY> {
     pub unsafe fn time(&self) -> YasonResult<Time> {
         debug_assert!(self.ty == DataType::Time);
         if IN_ARRAY {
-            Array::new_unchecked(self.yason).read_time(self.value_pos)
+            unsafe { Array::new_unchecked(self.yason) }.read_time(self.value_pos)
         } else {
             self.yason.read_time(self.value_pos)
         }

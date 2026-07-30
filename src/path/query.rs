@@ -454,10 +454,10 @@ fn non_array_multi_steps_relaxed_match(steps: &[SingleStep]) -> bool {
 fn non_array_range_step_relaxed_match(begin: &SingleIndex, end: &SingleIndex) -> bool {
     // For non-array types, an array of size 1 is automatically encapsulated for relaxed matching
     // and only index 0 can be matched.
-    if let Some((b, _)) = find_range(begin, end, 0) {
-        if b == 0 {
-            return true;
-        }
+    if let Some((b, _)) = find_range(begin, end, 0)
+        && b == 0
+    {
+        return true;
     }
 
     false
@@ -493,11 +493,7 @@ fn find_range(begin: &SingleIndex, end: &SingleIndex, last: usize) -> Option<(us
 
     #[inline]
     fn order(l: usize, r: usize) -> (usize, usize) {
-        if l <= r {
-            (l, r)
-        } else {
-            (r, l)
-        }
+        if l <= r { (l, r) } else { (r, l) }
     }
 
     match (begin, end) {
