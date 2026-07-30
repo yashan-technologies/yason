@@ -13,12 +13,12 @@ homepage = "https://github.com/cod-technologies/yason"
 documentation = "https://docs.rs/yason/"
 
 [dependencies]
-decimal-rs = "0.1.44"
+decimal-rs = "0.2.0"
 sqldatetime = { version = "0.2.0", features = ["oracle"] }
-serde = { version = "1.0.138", optional = true }
+serde = { version = "1.0.229", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.147"
+libc = "0.2.189"
 
 [dev-dependencies]
 bencher = "0.1.5"
