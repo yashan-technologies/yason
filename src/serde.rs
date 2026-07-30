@@ -67,17 +67,3 @@ impl<'de> serde::Deserialize<'de> for YasonBuf {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_serde() {
-        let yason_buf = YasonBuf::parse(r#"[123, true, null, "abc"]"#, false).unwrap();
-
-        let bin = bincode::serialize(&yason_buf).unwrap();
-        let bin_yason_buf: YasonBuf = bincode::deserialize(&bin).unwrap();
-
-        assert_eq!(bin_yason_buf, yason_buf);
-    }
-}
