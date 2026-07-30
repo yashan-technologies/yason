@@ -9,6 +9,7 @@ pub use crate::yason::object::{KeyIter, Object, ObjectIter, ValueIter};
 use crate::binary::*;
 use crate::format::{CompactFormatter, FormatResult, Formatter, LazyFormat, PrettyFormatter};
 use crate::util::{decode_varint, slice_to_array};
+use crate::vec::VecExt;
 use crate::{BuildError, DataType, Date, Number, Scalar, Time, Timestamp};
 use std::borrow::Borrow;
 use std::collections::TryReserveError;
@@ -59,6 +60,13 @@ impl From<BuildError> for YasonError {
     }
 }
 
+impl From<TryReserveError> for YasonError {
+    #[inline]
+    fn from(err: TryReserveError) -> Self {
+        YasonError::TryReserveError(err)
+    }
+}
+
 impl Error for YasonError {}
 
 pub type YasonResult<T> = std::result::Result<T, YasonError>;
@@ -84,9 +92,10 @@ impl YasonBuf {
     }
 
     #[inline]
-    pub fn clone_from_yason(&mut self, yason: &Yason) {
+    pub fn try_clone_from_yason(&mut self, yason: &Yason) -> YasonResult<()> {
         self.bytes.clear();
-        self.bytes.extend_from_slice(yason.as_bytes())
+        self.bytes.try_extend_from_slice(yason.as_bytes())?;
+        Ok(())
     }
 }
 
