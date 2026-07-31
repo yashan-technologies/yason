@@ -1,12 +1,11 @@
 //! Floating-point format
 
 use crate::format::WriteExt;
+use libc::snprintf;
 use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
 use std::num::FpCategory;
 use std::ops::Deref;
-#[cfg(target_os = "windows")]
-use std::os::raw::{c_char, c_int};
 
 pub(crate) trait Floating: Copy {
     const FORMAT: &'static str;
@@ -69,14 +68,6 @@ impl<T: Floating> Deref for FloatingFormat<T> {
         &self.0
     }
 }
-
-#[cfg_attr(target_os = "windows", link(name = "legacy_stdio_definitions"))]
-unsafe extern "C" {
-    fn snprintf(s: *mut c_char, n: usize, format: *const c_char, ...) -> c_int;
-}
-
-#[cfg(not(target_os = "windows"))]
-use libc::snprintf;
 
 impl<T: Floating> Display for FloatingFormat<T> {
     #[inline]
