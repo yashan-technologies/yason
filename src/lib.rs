@@ -28,19 +28,12 @@
 //!     8 |     // 16-bit signed integer
 //!     9 |     // 32-bit signed integer
 //!     10 |    // 64-bit signed integer
-//!     11 |    // 8-bit unsigned integer
-//!     12 |    // 16-bit unsigned integer
-//!     13 |    // 32-bit unsigned integer
-//!     14 |    // 64-bit unsigned integer
-//!     15 |    // 32-bit floating point
-//!     16 |    // 64-bit floating point
-//!     17 |    // binary data
-//!     18 |    // timestamp
-//!     19 |    // date
-//!     20 |    // short date
-//!     21 |    // time
-//!     22 |    // interval year-month
-//!     23 |    // interval day-time
+//!     11 |    // 32-bit floating point
+//!     12 |    // 64-bit floating point
+//!     13 |    // binary data
+//!     14 |    // timestamp
+//!     15 |    // date
+//!     16 |    // time
 //!
 //! value ::=
 //!     object |
@@ -55,19 +48,12 @@
 //!     int16 |             // 16-bit signed integer
 //!     int32 |             // 32-bit signed integer
 //!     int64 |             // 64-bit signed integer
-//!     uint8 |             // 8-bit unsigned integer
-//!     uint16 |            // 16-bit unsigned integer
-//!     uint32 |            // 32-bit unsigned integer
-//!     uint64 |            // 64-bit unsigned integer
 //!     float32 |           // 32-bit floating point
 //!     float64 |           // 64-bit floating point
 //!     binary |            // binary data
 //!     timestamp |         // timestamp
 //!     date |              // date
-//!     short-date |        // short date
 //!     time |              // time
-//!     interval-ym |       // interval year-month
-//!     interval-dt         // interval day-time
 //!
 //! string ::= data-length uint8*
 //! number ::= uint8 uint8* // first uint8 indicates size of number
@@ -75,10 +61,7 @@
 //! binary ::= data-length uint8*
 //! timestamp ::= int64
 //! date ::= int64
-//! short-date ::= int32
 //! time ::= int64
-//! interval-ym ::= int32
-//! interval-dt ::= int64
 //!
 //! data-length ::= uint8*  // If the high bit of a byte is 1,
 //!                         // the length field is continued in the next byte,
