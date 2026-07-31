@@ -79,7 +79,7 @@ pub enum DecodeError {
 }
 
 #[inline]
-fn decode_byte(byte: u8) -> Result<u32, DecodeError> {
+const fn decode_byte(byte: u8) -> Result<u32, DecodeError> {
     let dec = DECODE_TABLE[byte as usize];
     if dec == INVALID_VALUE {
         Err(DecodeError::InvalidByte(byte))

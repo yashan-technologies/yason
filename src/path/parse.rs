@@ -34,7 +34,7 @@ pub struct PathParseError {
 
 impl PathParseError {
     #[inline]
-    fn new(kind: PathParseErrorKind, pos: usize) -> Self {
+    const fn new(kind: PathParseErrorKind, pos: usize) -> Self {
         Self { kind, pos }
     }
 }

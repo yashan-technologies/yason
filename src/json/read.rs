@@ -17,7 +17,7 @@ impl<'a> SliceRead<'a> {
     }
 
     #[inline]
-    pub fn next(&mut self) -> Option<u8> {
+    pub const fn next(&mut self) -> Option<u8> {
         if self.index < self.slice.len() {
             let ch = self.slice[self.index];
             self.advance();
@@ -28,7 +28,7 @@ impl<'a> SliceRead<'a> {
     }
 
     #[inline]
-    pub fn peek(&self) -> Option<u8> {
+    pub const fn peek(&self) -> Option<u8> {
         if self.index < self.slice.len() {
             Some(self.slice[self.index])
         } else {
@@ -46,24 +46,24 @@ impl<'a> SliceRead<'a> {
     }
 
     #[inline(always)]
-    pub fn advance(&mut self) {
+    pub const fn advance(&mut self) {
         self.index += 1;
         self.column += 1;
     }
 
     #[inline(always)]
-    pub fn step_forward(&mut self, step: usize) {
+    pub const fn step_forward(&mut self, step: usize) {
         self.index += step;
         self.column += step;
     }
 
     #[inline]
-    pub fn index(&self) -> usize {
+    pub const fn index(&self) -> usize {
         self.index
     }
 
     #[inline]
-    pub fn position(&self) -> Position {
+    pub const fn position(&self) -> Position {
         Position {
             line: self.line,
             column: self.column,
@@ -71,7 +71,7 @@ impl<'a> SliceRead<'a> {
     }
 
     #[inline]
-    pub fn peek_position(&self) -> Position {
+    pub const fn peek_position(&self) -> Position {
         let mut step = 0;
         if self.index < self.slice.len() {
             step = 1;
@@ -84,7 +84,7 @@ impl<'a> SliceRead<'a> {
     }
 
     #[inline]
-    pub fn new_line(&mut self) {
+    pub const fn new_line(&mut self) {
         self.line += 1;
         self.column = 0;
     }

@@ -71,13 +71,13 @@ pub enum ErrorCode {
 
 impl JsonParseError {
     #[inline]
-    pub(crate) fn new(code: ErrorCode, line: usize, column: usize) -> Self {
+    pub(crate) const fn new(code: ErrorCode, line: usize, column: usize) -> Self {
         JsonParseError { code, line, column }
     }
 
     #[inline]
     #[allow(dead_code)]
-    pub(crate) fn errcode(&self) -> ErrorCode {
+    pub(crate) const fn errcode(&self) -> ErrorCode {
         self.code
     }
 }

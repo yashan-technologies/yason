@@ -78,7 +78,7 @@ pub struct PathExpression(Vec<Step>);
 
 impl PathExpression {
     #[inline]
-    fn new(steps: Vec<Step>) -> Self {
+    const fn new(steps: Vec<Step>) -> Self {
         Self(steps)
     }
 }

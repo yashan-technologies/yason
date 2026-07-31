@@ -57,7 +57,7 @@ impl<'a> Object<'a> {
     }
 
     #[inline]
-    pub fn yason(&self) -> &'a Yason {
+    pub const fn yason(&self) -> &'a Yason {
         self.0
     }
 

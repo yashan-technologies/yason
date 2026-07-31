@@ -378,7 +378,7 @@ impl Yason {
 
     /// Formats the yason as a compact or pretty string.
     #[inline]
-    pub fn format(&self, pretty: bool, extended: bool) -> impl Display + '_ {
+    pub const fn format(&self, pretty: bool, extended: bool) -> impl Display + '_ {
         LazyFormat::new(self, pretty, extended)
     }
 
@@ -635,7 +635,7 @@ pub enum Value<'a> {
 
 impl<'a> Value<'a> {
     #[inline]
-    pub fn data_type(&self) -> DataType {
+    pub const fn data_type(&self) -> DataType {
         match self {
             Value::Object(_) => DataType::Object,
             Value::Array(_) => DataType::Array,

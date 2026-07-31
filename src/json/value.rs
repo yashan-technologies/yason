@@ -20,17 +20,17 @@ pub enum Value<'a> {
 #[allow(dead_code)]
 impl<'a> Value<'a> {
     #[inline]
-    pub fn is_null(&self) -> bool {
+    pub const fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
 
     #[inline]
-    pub fn is_bool(&self) -> bool {
+    pub const fn is_bool(&self) -> bool {
         matches!(self, Value::Bool(_))
     }
 
     #[inline]
-    pub fn as_bool(&self) -> Option<bool> {
+    pub const fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),
             _ => None,
@@ -38,7 +38,7 @@ impl<'a> Value<'a> {
     }
 
     #[inline]
-    pub fn is_string(&self) -> bool {
+    pub const fn is_string(&self) -> bool {
         matches!(self, Value::String(_))
     }
 
@@ -51,12 +51,12 @@ impl<'a> Value<'a> {
     }
 
     #[inline]
-    pub fn is_number(&self) -> bool {
+    pub const fn is_number(&self) -> bool {
         matches!(self, Value::Number(_))
     }
 
     #[inline]
-    pub fn as_number(&self) -> Option<&'a str> {
+    pub const fn as_number(&self) -> Option<&'a str> {
         match self {
             Value::Number(n) => Some(n),
             _ => None,
@@ -64,12 +64,12 @@ impl<'a> Value<'a> {
     }
 
     #[inline]
-    pub fn is_array(&self) -> bool {
+    pub const fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
 
     #[inline]
-    pub fn as_array(&self) -> Option<&Vec<Value<'_>>> {
+    pub const fn as_array(&self) -> Option<&Vec<Value<'_>>> {
         match self {
             Value::Array(arr) => Some(arr),
             _ => None,
@@ -77,12 +77,12 @@ impl<'a> Value<'a> {
     }
 
     #[inline]
-    pub fn is_object(&self) -> bool {
+    pub const fn is_object(&self) -> bool {
         matches!(self, Value::Object(_))
     }
 
     #[inline]
-    pub fn as_object(&self) -> Option<&BTreeMap<Cow<'_, str>, Value<'_>>> {
+    pub const fn as_object(&self) -> Option<&BTreeMap<Cow<'_, str>, Value<'_>>> {
         match self {
             Value::Object(object) => Some(object),
             _ => None,

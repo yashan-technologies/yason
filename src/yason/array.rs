@@ -40,7 +40,7 @@ impl<'a> Array<'a> {
     }
 
     #[inline]
-    pub fn yason(&self) -> &Yason {
+    pub const fn yason(&self) -> &Yason {
         self.0
     }
 

@@ -14,7 +14,12 @@ pub struct Selector<'a, 'b> {
 
 impl<'a, 'b> Selector<'a, 'b> {
     #[inline]
-    pub fn new(steps: &'b [Step], with_wrapper: bool, query_buf: &'b mut Vec<Value<'a>>, for_exists: bool) -> Self {
+    pub const fn new(
+        steps: &'b [Step],
+        with_wrapper: bool,
+        query_buf: &'b mut Vec<Value<'a>>,
+        for_exists: bool,
+    ) -> Self {
         Self {
             steps,
             with_wrapper,

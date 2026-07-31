@@ -60,12 +60,12 @@ static ESCAPE: [bool; 256] = {
 };
 
 #[inline(always)]
-pub fn decode_hex_val(val: u8) -> Option<u8> {
+pub const fn decode_hex_val(val: u8) -> Option<u8> {
     HEX[val as usize]
 }
 
 #[inline(always)]
-pub fn is_escape(val: u8) -> bool {
+pub const fn is_escape(val: u8) -> bool {
     ESCAPE[val as usize]
 }
 

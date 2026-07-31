@@ -89,7 +89,7 @@ impl<'a> Depth<'a> {
     }
 
     #[inline]
-    fn borrow_mut(&mut self) -> Depth<'_> {
+    const fn borrow_mut(&mut self) -> Depth<'_> {
         match self {
             Depth::Owned(d) => Depth::Borrowed(d),
             Depth::Borrowed(d) => Depth::Borrowed(d),
@@ -97,7 +97,7 @@ impl<'a> Depth<'a> {
     }
 
     #[inline]
-    fn depth(&self) -> usize {
+    const fn depth(&self) -> usize {
         match self {
             Depth::Owned(d) => *d,
             Depth::Borrowed(d) => **d,
@@ -105,7 +105,7 @@ impl<'a> Depth<'a> {
     }
 
     #[inline]
-    fn increase(&mut self) {
+    const fn increase(&mut self) {
         match self {
             Depth::Borrowed(d) => **d += 1,
             Depth::Owned(d) => *d += 1,
@@ -113,7 +113,7 @@ impl<'a> Depth<'a> {
     }
 
     #[inline]
-    fn decrease(&mut self) {
+    const fn decrease(&mut self) {
         match self {
             Depth::Borrowed(d) => **d -= 1,
             Depth::Owned(d) => *d -= 1,
