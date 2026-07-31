@@ -52,17 +52,15 @@ impl Display for BuildError {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            BuildError::TryReserveError(e) => write!(f, "{}", e),
+            BuildError::TryReserveError(e) => write!(f, "{e}"),
             BuildError::InnerUncompletedError => write!(f, "inner builder is not finished"),
-            BuildError::InconsistentElementCount { expected, actual } => write!(
-                f,
-                "inconsistent element count, expected {}, actual {}",
-                expected, actual
-            ),
-            BuildError::StringTooLong(e) => write!(f, "string too long, length is {}", e),
-            BuildError::BinaryTooLong(e) => write!(f, "binary too long, length is {}", e),
-            BuildError::NumberError(e) => write!(f, "{}", e),
-            BuildError::JsonParseError(e) => write!(f, "{}", e),
+            BuildError::InconsistentElementCount { expected, actual } => {
+                write!(f, "inconsistent element count, expected {expected}, actual {actual}")
+            }
+            BuildError::StringTooLong(e) => write!(f, "string too long, length is {e}"),
+            BuildError::BinaryTooLong(e) => write!(f, "binary too long, length is {e}"),
+            BuildError::NumberError(e) => write!(f, "{e}"),
+            BuildError::JsonParseError(e) => write!(f, "{e}"),
             BuildError::NestedTooDeeply => write!(f, "nested too many depth"),
         }
     }

@@ -65,7 +65,7 @@ mod tests {
             if let Ok(index) = EXTENDED_NAME_TYPES.binary_search_by(|entry| entry.0.cmp(name)) {
                 assert_eq!(EXTENDED_NAME_TYPES[index].1, expected_type);
             } else {
-                panic!("failed to find {}", name);
+                panic!("failed to find {name}");
             }
         }
 

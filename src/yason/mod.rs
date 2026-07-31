@@ -35,16 +35,16 @@ impl fmt::Display for YasonError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             YasonError::IndexOutOfBounds { len, index } => {
-                write!(f, "index out of bounds: the len is {} but the index is {}", len, index)
+                write!(f, "index out of bounds: the len is {len} but the index is {index}")
             }
             YasonError::UnexpectedType { expected, actual } => {
-                write!(f, "data type mismatch, expect {}, but actual {}", expected, actual)
+                write!(f, "data type mismatch, expect {expected}, but actual {actual}")
             }
-            YasonError::InvalidDataType(e) => write!(f, "invalid data type value '{}'", e),
+            YasonError::InvalidDataType(e) => write!(f, "invalid data type value '{e}'"),
             YasonError::MultiValuesWithoutWrapper => {
                 write!(f, "multiple values cannot be returned without array wrapper")
             }
-            YasonError::TryReserveError(e) => write!(f, "{}", e),
+            YasonError::TryReserveError(e) => write!(f, "{e}"),
             YasonError::InvalidPathExpression => write!(f, "invalid path expression"),
         }
     }

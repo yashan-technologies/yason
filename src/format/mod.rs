@@ -27,10 +27,10 @@ impl Display for FormatError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FormatError::FmtError(e) => write!(f, "{}", e),
-            FormatError::NumberFormatError(e) => write!(f, "{}", e),
-            FormatError::YasonError(e) => write!(f, "{}", e),
-            FormatError::DateTimeError(e) => write!(f, "{}", e),
+            FormatError::FmtError(e) => write!(f, "{e}"),
+            FormatError::NumberFormatError(e) => write!(f, "{e}"),
+            FormatError::YasonError(e) => write!(f, "{e}"),
+            FormatError::DateTimeError(e) => write!(f, "{e}"),
         }
     }
 }
@@ -155,19 +155,19 @@ pub trait Formatter {
 
     #[inline]
     fn write_tinyint<W: fmt::Write>(&mut self, value: i8, writer: &mut W) -> FormatResult<()> {
-        write!(writer, "{}", value)?;
+        write!(writer, "{value}")?;
         Ok(())
     }
 
     #[inline]
     fn write_smallint<W: fmt::Write>(&mut self, value: i16, writer: &mut W) -> FormatResult<()> {
-        write!(writer, "{}", value)?;
+        write!(writer, "{value}")?;
         Ok(())
     }
 
     #[inline]
     fn write_integer<W: fmt::Write>(&mut self, value: i32, writer: &mut W) -> FormatResult<()> {
-        write!(writer, "{}", value)?;
+        write!(writer, "{value}")?;
         Ok(())
     }
 
@@ -175,16 +175,16 @@ pub trait Formatter {
     fn write_bigint<W: fmt::Write>(&mut self, value: i64, writer: &mut W) -> FormatResult<()> {
         if self.extended() {
             if (MIN_SAFE_BIGINT..=MAX_SAFE_BIGINT).contains(&value) {
-                write!(writer, "{}", value)?;
+                write!(writer, "{value}")?;
                 Ok(())
             } else {
                 self.write_extended_object(writer, BIGINT_EXTENDED_NAME, |w| {
-                    write!(w, "\"{}\"", value)?;
+                    write!(w, "\"{value}\"")?;
                     Ok(())
                 })
             }
         } else {
-            write!(writer, "{}", value)?;
+            write!(writer, "{value}")?;
             Ok(())
         }
     }
@@ -193,7 +193,7 @@ pub trait Formatter {
     fn write_float<W: Write>(&mut self, value: f32, writer: &mut W) -> FormatResult<()> {
         let value = FloatingFormat(value);
         let write_quoted = |w: &mut W| {
-            write!(w, r#""{}""#, value)?;
+            write!(w, r#""{value}""#)?;
             Ok(())
         };
 
@@ -202,7 +202,7 @@ pub trait Formatter {
             self.write_extended_object(writer, FLOAT_EXTENDED_NAME, write_quoted)
         } else if value.is_finite() {
             // Standard + finite: numeric output
-            write!(writer, "{}", value)?;
+            write!(writer, "{value}")?;
             Ok(())
         } else {
             // Standard + not finite: quote
@@ -214,13 +214,13 @@ pub trait Formatter {
     fn write_double<W: Write>(&mut self, value: f64, writer: &mut W) -> FormatResult<()> {
         let value = FloatingFormat(value);
         let write_quoted = |w: &mut W| {
-            write!(w, r#""{}""#, value)?;
+            write!(w, r#""{value}""#)?;
             Ok(())
         };
 
         if value.is_finite() {
             // finite: numeric output
-            write!(writer, "{}", value)?;
+            write!(writer, "{value}")?;
             Ok(())
         } else if self.extended() {
             // Extended + not finite: wrap

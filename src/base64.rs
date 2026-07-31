@@ -145,7 +145,7 @@ mod tests {
     fn print_decode_table() {
         let m = build_decode_table();
         for c in m.chunks(16) {
-            println!("{:?}", c);
+            println!("{c:?}");
         }
     }
 

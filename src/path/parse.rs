@@ -78,7 +78,7 @@ impl Display for PathParseErrorKind {
             PathParseErrorKind::UnexpectedCharacterAtEnd => write!(f, "unexpected characters after end of path"),
             PathParseErrorKind::InvalidCharacterAtStepStart => write!(f, "invalid character at start of step"),
             PathParseErrorKind::EmptyArrayStep => write!(f, "empty array subscript"),
-            PathParseErrorKind::TryReserveError(e) => write!(f, "{}", e),
+            PathParseErrorKind::TryReserveError(e) => write!(f, "{e}"),
         }
     }
 }
