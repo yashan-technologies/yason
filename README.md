@@ -8,7 +8,7 @@ Encoding and decoding support for YASON in Rust
 
 ## Rust Version
 
-This version of `yason` requires Rust 1.57 or later.
+This version of `yason` requires Rust 1.88 or later.
 
 ## License
 
